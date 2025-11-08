@@ -1,0 +1,88 @@
+PHP2 - Lập trình PHP nâng cao
+Bài 2: Kế thừa và Interface trong PHP
+
+Kế thừa (Inheritance) cho phép class con kế thừa properties và methods từ class cha.
+Sử dụng từ khóa extends để kế thừa.
+
+Ví dụ kế thừa:
+<?php
+    class Person {
+        public $name;
+        public $age;
+
+        public function __construct($name, $age) {
+            $this->name = $name;
+            $this->age = $age;
+        }
+
+        public function introduce() {
+            return "Tôi là $this->name, $this->age tuổi";
+        }
+    }
+
+    class Student extends Person {
+        public $studentId;
+
+        public function __construct($name, $age, $studentId) {
+            parent::__construct($name, $age);
+            $this->studentId = $studentId;
+        }
+
+        public function study() {
+            return "$this->name đang học";
+        }
+    }
+
+    $student = new Student("Nguyễn Văn A", 20, "SV001");
+    echo $student->introduce();
+?>
+
+Interface định nghĩa các method mà class phải implement.
+Sử dụng từ khóa implements.
+
+Ví dụ Interface:
+<?php
+    interface Animal {
+        public function makeSound();
+        public function eat();
+    }
+
+    class Dog implements Animal {
+        public function makeSound() {
+            return "Gâu gâu";
+        }
+
+        public function eat() {
+            return "Đang ăn";
+        }
+    }
+?>
+
+Abstract Class:
+- Không thể tạo object trực tiếp
+- Phải có ít nhất một abstract method
+- Class con phải implement abstract methods
+
+Ví dụ Abstract Class:
+<?php
+    abstract class Shape {
+        abstract public function calculateArea();
+
+        public function getInfo() {
+            return "Đây là hình học";
+        }
+    }
+
+    class Circle extends Shape {
+        private $radius;
+
+        public function __construct($radius) {
+            $this->radius = $radius;
+        }
+
+        public function calculateArea() {
+            return pi() * $this->radius * $this->radius;
+        }
+    }
+?>
+

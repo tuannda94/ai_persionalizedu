@@ -1,0 +1,47 @@
+PHP1 - Lập trình PHP cơ bản
+Bài 2: Mảng và vòng lặp trong PHP
+
+Mảng (Array) là cấu trúc dữ liệu lưu trữ nhiều giá trị trong một biến.
+Có 3 loại mảng trong PHP:
+- Indexed array: Mảng có chỉ số số
+- Associative array: Mảng kết hợp (key-value)
+- Multidimensional array: Mảng đa chiều
+
+Ví dụ Indexed array:
+<?php
+    $fruits = array("Táo", "Chuối", "Cam");
+    // Hoặc
+    $fruits = ["Táo", "Chuối", "Cam"];
+    echo $fruits[0]; // Output: Táo
+?>
+
+Ví dụ Associative array:
+<?php
+    $student = [
+        "name" => "Nguyễn Văn A",
+        "age" => 20,
+        "grade" => "A"
+    ];
+    echo $student["name"]; // Output: Nguyễn Văn A
+?>
+
+Vòng lặp trong PHP:
+- for: Lặp với số lần xác định
+- while: Lặp khi điều kiện đúng
+- foreach: Lặp qua mảng
+
+Ví dụ vòng lặp for:
+<?php
+    for ($i = 1; $i <= 5; $i++) {
+        echo "Số: $i<br>";
+    }
+?>
+
+Ví dụ vòng lặp foreach:
+<?php
+    $fruits = ["Táo", "Chuối", "Cam"];
+    foreach ($fruits as $fruit) {
+        echo "$fruit<br>";
+    }
+?>
+

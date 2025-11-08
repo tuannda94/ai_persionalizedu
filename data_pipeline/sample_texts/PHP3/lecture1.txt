@@ -1,0 +1,62 @@
+PHP3 - Framework PHP và Project
+Bài 1: Giới thiệu Laravel Framework
+
+Laravel là PHP framework phổ biến, mạnh mẽ và dễ học.
+Laravel sử dụng kiến trúc MVC (Model-View-Controller).
+
+Cài đặt Laravel:
+composer create-project laravel/laravel myproject
+
+Cấu trúc thư mục Laravel:
+- app/: Chứa application code
+- routes/: Định nghĩa routes
+- resources/views/: Chứa view files
+- database/: Migrations và seeds
+- public/: Entry point của ứng dụng
+
+Route trong Laravel:
+<?php
+// routes/web.php
+Route::get('/', function () {
+    return view('welcome');
+});
+
+Route::get('/students', [StudentController::class, 'index']);
+Route::post('/students', [StudentController::class, 'store']);
+?>
+
+Controller trong Laravel:
+<?php
+namespace App\Http\Controllers;
+
+class StudentController extends Controller {
+    public function index() {
+        $students = Student::all();
+        return view('students.index', compact('students'));
+    }
+
+    public function store(Request $request) {
+        $student = new Student();
+        $student->name = $request->name;
+        $student->save();
+        return redirect('/students');
+    }
+}
+?>
+
+Blade Template Engine:
+- {{ }}: Echo dữ liệu (auto escape)
+- {!! !!}: Echo HTML
+- @if, @foreach, @while: Control structures
+- @extends, @section: Layout inheritance
+
+Ví dụ Blade:
+@extends('layouts.app')
+
+@section('content')
+    <h1>Danh sách sinh viên</h1>
+    @foreach($students as $student)
+        <p>{{ $student->name }}</p>
+    @endforeach
+@endsection
+

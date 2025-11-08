@@ -1,0 +1,53 @@
+PHP1 - Lập trình PHP cơ bản
+Bài 3: Hàm và xử lý form trong PHP
+
+Hàm (Function) là khối code có thể tái sử dụng.
+Cú pháp định nghĩa hàm:
+function functionName($param1, $param2) {
+    // code
+    return $value;
+}
+
+Ví dụ hàm đơn giản:
+<?php
+    function greet($name) {
+        return "Xin chào, $name!";
+    }
+    echo greet("Nguyễn Văn A");
+?>
+
+Hàm với giá trị mặc định:
+<?php
+    function calculate($a, $b, $operation = "add") {
+        if ($operation == "add") {
+            return $a + $b;
+        } elseif ($operation == "multiply") {
+            return $a * $b;
+        }
+    }
+    echo calculate(5, 3); // Output: 8
+?>
+
+Xử lý form trong PHP:
+- GET: Dữ liệu gửi qua URL, dùng $_GET
+- POST: Dữ liệu gửi ẩn, dùng $_POST
+- $_REQUEST: Lấy cả GET và POST
+
+Ví dụ xử lý form POST:
+<form method="POST" action="process.php">
+    <input type="text" name="username">
+    <input type="submit" value="Gửi">
+</form>
+
+<?php
+    if ($_SERVER["REQUEST_METHOD"] == "POST") {
+        $username = $_POST["username"];
+        echo "Xin chào, $username!";
+    }
+?>
+
+Validation dữ liệu form:
+- empty(): Kiểm tra biến rỗng
+- isset(): Kiểm tra biến đã được set
+- filter_var(): Lọc và validate dữ liệu
+

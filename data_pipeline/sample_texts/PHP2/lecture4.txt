@@ -1,0 +1,69 @@
+PHP2 - Lập trình PHP nâng cao
+Bài 4: Session và Cookie trong PHP
+
+Session và Cookie dùng để lưu trữ thông tin người dùng.
+Session lưu trên server, Cookie lưu trên trình duyệt.
+
+Session trong PHP:
+- session_start(): Bắt đầu session
+- $_SESSION: Mảng lưu dữ liệu session
+- session_destroy(): Xóa session
+
+Ví dụ sử dụng Session:
+<?php
+    session_start();
+
+    // Lưu dữ liệu vào session
+    $_SESSION["username"] = "nguyenvana";
+    $_SESSION["user_id"] = 123;
+
+    // Đọc dữ liệu từ session
+    if (isset($_SESSION["username"])) {
+        echo "Xin chào, " . $_SESSION["username"];
+    }
+
+    // Xóa session
+    session_destroy();
+?>
+
+Cookie trong PHP:
+- setcookie(): Tạo cookie
+- $_COOKIE: Mảng đọc cookie
+- Cookie có thời gian hết hạn
+
+Ví dụ sử dụng Cookie:
+<?php
+    // Tạo cookie (30 ngày)
+    setcookie("username", "nguyenvana", time() + (86400 * 30), "/");
+
+    // Đọc cookie
+    if (isset($_COOKIE["username"])) {
+        echo "Username: " . $_COOKIE["username"];
+    }
+
+    // Xóa cookie
+    setcookie("username", "", time() - 3600);
+?>
+
+Authentication với Session:
+<?php
+    session_start();
+
+    // Login
+    if ($_POST["username"] == "admin" && $_POST["password"] == "123456") {
+        $_SESSION["logged_in"] = true;
+        $_SESSION["username"] = $_POST["username"];
+        header("Location: dashboard.php");
+    }
+
+    // Check login
+    if (!isset($_SESSION["logged_in"]) || $_SESSION["logged_in"] != true) {
+        header("Location: login.php");
+        exit();
+    }
+
+    // Logout
+    session_destroy();
+    header("Location: login.php");
+?>
+

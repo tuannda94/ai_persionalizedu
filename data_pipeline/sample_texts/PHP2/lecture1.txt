@@ -1,0 +1,59 @@
+PHP2 - Lập trình PHP nâng cao
+Bài 1: Lập trình hướng đối tượng (OOP) trong PHP
+
+Lập trình hướng đối tượng (OOP) giúp code dễ bảo trì và tái sử dụng.
+Các khái niệm OOP trong PHP:
+- Class: Lớp, khuôn mẫu để tạo đối tượng
+- Object: Đối tượng, instance của class
+- Property: Thuộc tính của class
+- Method: Phương thức của class
+- Constructor: Hàm khởi tạo
+- Inheritance: Kế thừa
+- Encapsulation: Đóng gói
+- Polymorphism: Đa hình
+
+Ví dụ class cơ bản:
+<?php
+    class Student {
+        // Properties
+        public $name;
+        public $age;
+        private $grade;
+
+        // Constructor
+        public function __construct($name, $age) {
+            $this->name = $name;
+            $this->age = $age;
+        }
+
+        // Method
+        public function getInfo() {
+            return "Tên: $this->name, Tuổi: $this->age";
+        }
+    }
+
+    // Tạo object
+    $student = new Student("Nguyễn Văn A", 20);
+    echo $student->getInfo();
+?>
+
+Access Modifiers:
+- public: Truy cập từ mọi nơi
+- private: Chỉ truy cập trong class
+- protected: Truy cập trong class và class con
+
+Getter và Setter:
+<?php
+    class Student {
+        private $grade;
+
+        public function setGrade($grade) {
+            $this->grade = $grade;
+        }
+
+        public function getGrade() {
+            return $this->grade;
+        }
+    }
+?>
+

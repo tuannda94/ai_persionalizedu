@@ -1,0 +1,84 @@
+PHP3 - Framework PHP và Project
+Bài 3: API RESTful với Laravel
+
+RESTful API là cách xây dựng API theo chuẩn REST.
+REST sử dụng HTTP methods: GET, POST, PUT, DELETE.
+
+API Routes trong Laravel:
+<?php
+// routes/api.php
+Route::get('/students', [StudentController::class, 'index']);
+Route::post('/students', [StudentController::class, 'store']);
+Route::get('/students/{id}', [StudentController::class, 'show']);
+Route::put('/students/{id}', [StudentController::class, 'update']);
+Route::delete('/students/{id}', [StudentController::class, 'destroy']);
+?>
+
+API Resource Controller:
+<?php
+php artisan make:controller StudentController --api
+
+class StudentController extends Controller {
+    public function index() {
+        $students = Student::all();
+        return response()->json($students);
+    }
+
+    public function store(Request $request) {
+        $student = Student::create($request->all());
+        return response()->json($student, 201);
+    }
+
+    public function show($id) {
+        $student = Student::findOrFail($id);
+        return response()->json($student);
+    }
+
+    public function update(Request $request, $id) {
+        $student = Student::findOrFail($id);
+        $student->update($request->all());
+        return response()->json($student);
+    }
+
+    public function destroy($id) {
+        $student = Student::findOrFail($id);
+        $student->delete();
+        return response()->json(null, 204);
+    }
+}
+?>
+
+API Resources (Transform data):
+<?php
+php artisan make:resource StudentResource
+
+class StudentResource extends JsonResource {
+    public function toArray($request) {
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'email' => $this->email,
+            'created_at' => $this->created_at->format('Y-m-d'),
+        ];
+    }
+}
+
+// Sử dụng
+return new StudentResource($student);
+return StudentResource::collection($students);
+?>
+
+Validation trong API:
+<?php
+public function store(Request $request) {
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|unique:students',
+        'age' => 'required|integer|min:18|max:100'
+    ]);
+
+    $student = Student::create($validated);
+    return response()->json($student, 201);
+}
+?>
+

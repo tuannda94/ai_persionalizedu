@@ -1,0 +1,85 @@
+PHP3 - Framework PHP và Project
+Bài 4: Authentication và Authorization trong Laravel
+
+Laravel cung cấp hệ thống authentication sẵn có.
+Sử dụng Laravel Breeze hoặc Laravel Sanctum cho API.
+
+Cài đặt Laravel Breeze:
+composer require laravel/breeze --dev
+php artisan breeze:install
+npm install && npm run dev
+
+Authentication với Breeze:
+- Login: /login
+- Register: /register
+- Logout: /logout
+- Password Reset: /forgot-password
+
+Middleware Auth:
+<?php
+// routes/web.php
+Route::middleware(['auth'])->group(function () {
+    Route::get('/dashboard', function () {
+        return view('dashboard');
+    });
+});
+
+// Hoặc trong Controller
+public function __construct() {
+    $this->middleware('auth');
+}
+?>
+
+Authorization với Policies:
+<?php
+php artisan make:policy StudentPolicy
+
+class StudentPolicy {
+    public function update(User $user, Student $student) {
+        return $user->id === $student->user_id;
+    }
+
+    public function delete(User $user, Student $student) {
+        return $user->isAdmin();
+    }
+}
+
+// Sử dụng
+if ($user->can('update', $student)) {
+    // Allow update
+}
+
+$this->authorize('update', $student);
+?>
+
+Roles và Permissions:
+- Spatie Laravel Permission package
+- Định nghĩa roles: admin, teacher, student
+- Gán permissions cho roles
+
+Ví dụ sử dụng:
+<?php
+$user->assignRole('admin');
+$user->hasRole('admin');
+$user->can('edit students');
+?>
+
+API Authentication với Sanctum:
+<?php
+// Cài đặt
+composer require laravel/sanctum
+php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
+php artisan migrate
+
+// Tạo token
+$token = $user->createToken('api-token')->plainTextToken;
+
+// Sử dụng token trong request
+Authorization: Bearer {token}
+
+// Middleware
+Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+    return $request->user();
+});
+?>
+

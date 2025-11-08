@@ -1,0 +1,68 @@
+PHP2 - Lập trình PHP nâng cao
+Bài 3: Kết nối Database với MySQLi và PDO
+
+PHP hỗ trợ kết nối database qua MySQLi và PDO.
+MySQLi (MySQL Improved) là extension cải tiến cho MySQL.
+PDO (PHP Data Objects) hỗ trợ nhiều loại database.
+
+Kết nối MySQLi:
+<?php
+    $servername = "localhost";
+    $username = "root";
+    $password = "";
+    $dbname = "fpt_poly";
+
+    // Tạo connection
+    $conn = new mysqli($servername, $username, $password, $dbname);
+
+    // Kiểm tra connection
+    if ($conn->connect_error) {
+        die("Connection failed: " . $conn->connect_error);
+    }
+
+    // Query
+    $sql = "SELECT * FROM students";
+    $result = $conn->query($sql);
+
+    if ($result->num_rows > 0) {
+        while($row = $result->fetch_assoc()) {
+            echo "ID: " . $row["id"] . " - Name: " . $row["name"];
+        }
+    }
+
+    $conn->close();
+?>
+
+Prepared Statements (Bảo mật):
+<?php
+    $stmt = $conn->prepare("INSERT INTO students (name, email) VALUES (?, ?)");
+    $stmt->bind_param("ss", $name, $email);
+
+    $name = "Nguyễn Văn A";
+    $email = "a@fpt.edu.vn";
+    $stmt->execute();
+
+    $stmt->close();
+?>
+
+Kết nối PDO:
+<?php
+    try {
+        $pdo = new PDO("mysql:host=localhost;dbname=fpt_poly", $username, $password);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        $stmt = $pdo->prepare("SELECT * FROM students WHERE id = :id");
+        $stmt->execute(['id' => 1]);
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    } catch(PDOException $e) {
+        echo "Error: " . $e->getMessage();
+    }
+?>
+
+CRUD Operations:
+- CREATE: INSERT INTO
+- READ: SELECT
+- UPDATE: UPDATE
+- DELETE: DELETE
+

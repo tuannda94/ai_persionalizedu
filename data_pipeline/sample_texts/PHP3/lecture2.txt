@@ -1,0 +1,89 @@
+PHP3 - Framework PHP và Project
+Bài 2: Eloquent ORM và Database trong Laravel
+
+Eloquent là ORM (Object-Relational Mapping) của Laravel.
+Eloquent giúp tương tác database dễ dàng hơn.
+
+Model trong Laravel:
+<?php
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Student extends Model {
+    protected $table = 'students';
+    protected $fillable = ['name', 'email', 'phone'];
+    protected $hidden = ['password'];
+}
+?>
+
+Eloquent Queries:
+<?php
+// Lấy tất cả
+$students = Student::all();
+
+// Lấy theo điều kiện
+$student = Student::where('id', 1)->first();
+$students = Student::where('age', '>', 18)->get();
+
+// Tạo mới
+$student = new Student();
+$student->name = "Nguyễn Văn A";
+$student->email = "a@fpt.edu.vn";
+$student->save();
+
+// Hoặc
+Student::create([
+    'name' => 'Nguyễn Văn A',
+    'email' => 'a@fpt.edu.vn'
+]);
+
+// Cập nhật
+$student = Student::find(1);
+$student->name = "Nguyễn Văn B";
+$student->save();
+
+// Xóa
+$student = Student::find(1);
+$student->delete();
+?>
+
+Relationships trong Eloquent:
+- hasOne: Một-một
+- hasMany: Một-nhiều
+- belongsTo: Nhiều-một
+- belongsToMany: Nhiều-nhiều
+
+Ví dụ Relationships:
+<?php
+class Student extends Model {
+    public function courses() {
+        return $this->belongsToMany(Course::class);
+    }
+}
+
+class Course extends Model {
+    public function students() {
+        return $this->belongsToMany(Student::class);
+    }
+}
+
+// Sử dụng
+$student = Student::find(1);
+$courses = $student->courses;
+?>
+
+Migrations:
+php artisan make:migration create_students_table
+
+<?php
+public function up() {
+    Schema::create('students', function (Blueprint $table) {
+        $table->id();
+        $table->string('name');
+        $table->string('email')->unique();
+        $table->timestamps();
+    });
+}
+?>
+

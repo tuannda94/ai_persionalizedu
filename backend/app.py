@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -9,8 +9,12 @@ import requests
 import time
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import asyncio
+from chat_storage import (
+    save_message, get_conversation_history, create_conversation_id,
+    get_user_conversations, delete_conversation, init_database
+)
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 MODEL_PACKAGES = BASE_DIR / "model_packages"
@@ -94,9 +98,18 @@ if len(collections) == 0:
 else:
     print(f"✅ RAG Engine ready with {len(collections)} subjects: {list(collections.keys())}")
 
+# Đảm bảo database được khởi tạo khi app startup
+@app.on_event("startup")
+async def startup_event():
+    """Khởi tạo database khi app startup"""
+    init_database()
+    print("✅ Chat storage database ready")
+
 class QueryReq(BaseModel):
     question: str
     subject: Optional[str] = None  # Optional: tự động detect nếu không có
+    user_id: Optional[str] = None  # User ID (mặc định: "anonymous")
+    conversation_id: Optional[str] = None  # Conversation ID (tự động tạo nếu không có)
 
 class TelemetryReq(BaseModel):
     event: str
@@ -121,8 +134,8 @@ def log_query(subject: str, question: str, answer: str, used_segments: int, dura
     with QUERY_LOG.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
-def get_rag_context(question: str, subject: Optional[str] = None):
-    """Helper function để lấy RAG context và build prompt"""
+def get_rag_context(question: str, subject: Optional[str] = None, conversation_history: Optional[List[dict]] = None):
+    """Helper function để lấy RAG context và build prompt với conversation history"""
     # Step 0: Tự động detect subject hoặc search across all
     if subject and subject in collections:
         collection = collections[subject]
@@ -160,15 +173,25 @@ def get_rag_context(question: str, subject: Optional[str] = None):
     if not docs or len(docs) == 0:
         return None, None, None
 
-    # Build prompt
+    # Build prompt với conversation history
     prompt = "Bạn là một trợ lý học tập AI. Hãy trả lời câu hỏi DỰA TRÊN các đoạn văn bản sau đây. Trả lời BẰNG TIẾNG VIỆT.\n\n"
+
+    # Thêm conversation history nếu có (chỉ lấy 6 lượt gần nhất để không quá dài)
+    if conversation_history and len(conversation_history) > 0:
+        recent_history = conversation_history[-6:]  # Lấy 6 messages gần nhất
+        prompt += "Lịch sử hội thoại trước đó:\n"
+        for msg in recent_history:
+            role_label = "Sinh viên" if msg['role'] == 'user' else "Trợ lý"
+            prompt += f"{role_label}: {msg['message']}\n"
+        prompt += "\n"
+
     prompt += "Các đoạn văn bản tham khảo:\n"
     for i, d in enumerate(docs):
         meta = metadatas[i] if i < len(metadatas) else {}
         source_file = meta.get('source', 'unknown')
         prompt += f"\n---Đoạn {i+1} (từ {source_file})---\n{d}\n"
 
-    prompt += f"\n\nCâu hỏi: {question}\n\n"
+    prompt += f"\n\nCâu hỏi hiện tại: {question}\n\n"
     prompt += "Hãy trả lời một cách chi tiết và dễ hiểu BẰNG TIẾNG VIỆT. Nếu không có thông tin trong các đoạn trên, hãy nói rõ."
 
     return prompt, detected_subject, len(docs)
@@ -176,16 +199,32 @@ def get_rag_context(question: str, subject: Optional[str] = None):
 @app.post('/query/stream')
 def query_stream(req: QueryReq):
     """
-    Streaming RAG Query Flow:
-    1. Tự động detect subject hoặc search across all subjects
-    2. Query ChromaDB để lấy các đoạn văn bản gần nhất
-    3. Ghép prompt với context
-    4. Stream response từ Ollama (yêu cầu trả lời bằng tiếng Việt)
+    Streaming RAG Query Flow với conversation history:
+    1. Load conversation history nếu có
+    2. Tự động detect subject hoặc search across all subjects
+    3. Query ChromaDB để lấy các đoạn văn bản gần nhất
+    4. Ghép prompt với context và history
+    5. Stream response từ Ollama
+    6. Lưu messages vào database
     """
     start_time = time.time()
 
-    # Get RAG context
-    prompt, detected_subject, used_segments = get_rag_context(req.question, req.subject)
+    # Xử lý user_id và conversation_id
+    user_id = req.user_id or "anonymous"
+    conversation_id = req.conversation_id or create_conversation_id()
+
+    # Load conversation history
+    conversation_history = []
+    if req.conversation_id:
+        conversation_history = get_conversation_history(user_id, conversation_id, max_messages=10)
+        print(f"📜 Loaded {len(conversation_history)} messages from conversation {conversation_id}")
+
+    # Get RAG context với history
+    prompt, detected_subject, used_segments = get_rag_context(
+        req.question,
+        req.subject,
+        conversation_history=conversation_history
+    )
 
     if not prompt:
         def error_stream():
@@ -206,6 +245,9 @@ def query_stream(req: QueryReq):
     def stream():
         full_answer = ""
         try:
+            # Lưu user message trước
+            save_message(user_id, conversation_id, "user", req.question)
+
             with requests.post(ollama_url, json=payload, stream=True, timeout=300) as r:
                 r.raise_for_status()
 
@@ -218,17 +260,26 @@ def query_stream(req: QueryReq):
                             if token:
                                 full_answer += token
                                 # Send token to client
-                                yield f"data: {json.dumps({'token': token, 'done': False})}\n\n"
+                                yield f"data: {json.dumps({'token': token, 'done': False, 'conversation_id': conversation_id})}\n\n"
 
                             # Check if done
                             if chunk_data.get('done', False):
+                                # Lưu assistant response
+                                save_message(user_id, conversation_id, "assistant", full_answer)
+
                                 # Send final metadata
                                 duration_ms = int((time.time() - start_time) * 1000)
-                                yield f"data: {json.dumps({'done': True, 'used_segments': used_segments, 'duration_ms': duration_ms, 'detected_subject': detected_subject})}\n\n"
+                                yield f"data: {json.dumps({
+                                    'done': True,
+                                    'used_segments': used_segments,
+                                    'duration_ms': duration_ms,
+                                    'detected_subject': detected_subject,
+                                    'conversation_id': conversation_id
+                                })}\n\n"
 
                                 # Log query
                                 log_query(detected_subject, req.question, full_answer, used_segments, duration_ms)
-                                print(f"✅ Streaming completed in {duration_ms}ms, used {used_segments} segments")
+                                print(f"✅ Streaming completed in {duration_ms}ms, used {used_segments} segments, conv_id: {conversation_id}")
                                 break
                         except json.JSONDecodeError:
                             continue
@@ -327,6 +378,57 @@ def telemetry(req: TelemetryReq):
             print(f"⚠️  Failed to send telemetry to cloud: {e}")
 
     return {"ok": True, "logged": True}
+
+@app.get('/conversations')
+def get_conversations(user_id: str = Query(default="anonymous")):
+    """Lấy danh sách conversations của user"""
+    try:
+        conversations = get_user_conversations(user_id, limit=50)
+        return {
+            "ok": True,
+            "conversations": conversations,
+            "count": len(conversations)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting conversations: {str(e)}")
+
+@app.get('/conversations/{conversation_id}/history')
+def get_history(conversation_id: str, user_id: str = Query(default="anonymous")):
+    """Lấy lịch sử của một conversation"""
+    try:
+        history = get_conversation_history(user_id, conversation_id)
+        return {
+            "ok": True,
+            "conversation_id": conversation_id,
+            "messages": history,
+            "count": len(history)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting history: {str(e)}")
+
+@app.delete('/conversations/{conversation_id}')
+def delete_conv(conversation_id: str, user_id: str = Query(default="anonymous")):
+    """Xóa một conversation"""
+    try:
+        deleted = delete_conversation(user_id, conversation_id)
+        if deleted:
+            return {"ok": True, "message": f"Conversation {conversation_id} deleted"}
+        else:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting conversation: {str(e)}")
+
+@app.get('/conversations/new')
+def create_conversation(user_id: str = Query(default="anonymous")):
+    """Tạo conversation mới"""
+    conversation_id = create_conversation_id()
+    return {
+        "ok": True,
+        "conversation_id": conversation_id,
+        "user_id": user_id
+    }
 
 @app.get('/health')
 def health():

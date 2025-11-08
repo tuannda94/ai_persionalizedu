@@ -1,0 +1,38 @@
+PHP1 - Lập trình PHP cơ bản
+Bài 1: Giới thiệu về PHP và cú pháp cơ bản
+
+PHP (Hypertext Preprocessor) là ngôn ngữ lập trình server-side phổ biến cho phát triển web.
+PHP được sử dụng để tạo các trang web động, xử lý form, kết nối database.
+
+Cú pháp cơ bản:
+- PHP code được đặt trong thẻ <?php ... ?>
+- Mỗi câu lệnh kết thúc bằng dấu chấm phẩy (;)
+- PHP phân biệt chữ hoa và chữ thường
+
+Ví dụ Hello World:
+<?php
+    echo "Hello, World!";
+?>
+
+Biến trong PHP:
+- Bắt đầu bằng dấu $ theo sau là tên biến
+- Tên biến có thể chứa chữ cái, số và dấu gạch dưới
+- PHP tự động xác định kiểu dữ liệu (dynamic typing)
+
+Ví dụ về biến:
+<?php
+    $name = "Nguyễn Văn A";
+    $age = 20;
+    $isStudent = true;
+    echo "Tên: $name, Tuổi: $age";
+?>
+
+Kiểu dữ liệu trong PHP:
+- String: Chuỗi ký tự
+- Integer: Số nguyên
+- Float: Số thực
+- Boolean: true/false
+- Array: Mảng
+- Object: Đối tượng
+- NULL: Giá trị rỗng
+
