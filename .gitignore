@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Electron
+desktop/dist/
+desktop/renderer/build/
+desktop/renderer/.env.local
+desktop/renderer/.env.development.local
+desktop/renderer/.env.test.local
+desktop/renderer/.env.production.local
+
+# Model packages (generated)
+model_packages/
+
+# ChromaDB
+data_pipeline/vector_store/
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+*.env
+
+# Logs
+*.log
+logs/
+telemetry.log
+
+# Model files (nếu có)
+*.bin
+*.pt
+*.pth
+models/
+

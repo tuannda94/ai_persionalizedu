@@ -1,0 +1,30 @@
+CS102 - Data Structures and Algorithms
+Lecture 1: Introduction to Data Structures
+
+Data structures là cách tổ chức và lưu trữ dữ liệu trong máy tính.
+Các cấu trúc dữ liệu cơ bản:
+- Array: Mảng lưu trữ các phần tử liên tiếp
+- Linked List: Danh sách liên kết, mỗi node trỏ đến node tiếp theo
+- Stack: Ngăn xếp, LIFO (Last In First Out)
+- Queue: Hàng đợi, FIFO (First In First Out)
+- Tree: Cây, cấu trúc phân cấp
+- Hash Table: Bảng băm, truy cập nhanh O(1)
+
+Algorithms là các bước để giải quyết vấn đề.
+Độ phức tạp thời gian (Time Complexity):
+- O(1): Constant time
+- O(log n): Logarithmic time
+- O(n): Linear time
+- O(n log n): Linearithmic time
+- O(n²): Quadratic time
+
+Ví dụ về Array:
+arr = [1, 2, 3, 4, 5]
+print(arr[0])  # Output: 1
+
+Ví dụ về Stack:
+stack = []
+stack.append(1)  # Push
+stack.append(2)
+top = stack.pop()  # Pop, returns 2
+

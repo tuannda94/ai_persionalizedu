@@ -1,0 +1,21 @@
+CS101 - Introduction to Computer Science
+Lecture 1: Programming Fundamentals
+
+Programming là quá trình viết code để máy tính thực hiện các tác vụ.
+Các khái niệm cơ bản:
+- Variables: Biến lưu trữ dữ liệu
+- Functions: Hàm để tái sử dụng code
+- Control flow: if/else, loops để điều khiển luồng chương trình
+- Data structures: Arrays, lists để tổ chức dữ liệu
+
+Python là ngôn ngữ lập trình phổ biến cho người mới bắt đầu.
+Cú pháp đơn giản, dễ đọc, phù hợp cho việc học lập trình.
+
+Ví dụ về function:
+def greet(name):
+    return f"Hello, {name}!"
+
+Ví dụ về loop:
+for i in range(5):
+    print(i)
+
