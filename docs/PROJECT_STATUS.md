@@ -2,6 +2,8 @@
 
 ## Tiến độ Hiện tại
 
+> 📋 **Xem [EXPERT_REVIEW.md](EXPERT_REVIEW.md) để biết đánh giá chuyên gia và đề xuất tối ưu hóa**
+
 ### ✅ Phase 1: Cấu trúc & Tổ chức (Hoàn thành)
 - [x] Tách biệt components (student-app, remote-api, admin-dashboard)
 - [x] Tổ chức storage và scripts

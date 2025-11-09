@@ -7,6 +7,28 @@ from pathlib import Path
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+# BASE_DIR = student-app/local-backend (when __file__ is app/config.py)
+
+# Calculate project root (outside class to avoid Pydantic issues)
+# From BASE_DIR (student-app/local-backend):
+#   parent = student-app
+#   parent.parent = project root (AI_PersonalizedU)
+PROJECT_ROOT = BASE_DIR.parent.parent
+
+# Safety check: verify storage directory exists, if not try to find it
+if not (PROJECT_ROOT / "storage").exists():
+    # Try going up one more level if needed
+    if (PROJECT_ROOT.parent / "storage").exists():
+        PROJECT_ROOT = PROJECT_ROOT.parent
+    else:
+        # Last resort: search for storage directory
+        import os
+        cwd = Path(os.getcwd())
+        # Try to find project root by looking for storage directory
+        for path in [cwd, cwd.parent, cwd.parent.parent]:
+            if (path / "storage").exists():
+                PROJECT_ROOT = path
+                break
 
 
 class Settings(BaseSettings):
@@ -22,7 +44,7 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "llama3"
 
     # Model Packages (Local)
-    MODEL_PACKAGES_DIR: str = str(Path(BASE_DIR).parent.parent.parent.parent / "storage" / "model-packages")
+    MODEL_PACKAGES_DIR: str = str(PROJECT_ROOT / "storage" / "model-packages")
 
     # Storage (Local)
     STORAGE_DIR: str = str(BASE_DIR / "storage")
@@ -41,8 +63,14 @@ class Settings(BaseSettings):
     TELEMETRY_ENABLED: bool = True
     TELEMETRY_BATCH_SIZE: int = 10
 
+    # Feedback (optional, gửi đến remote API)
+    FEEDBACK_ENABLED: bool = True
+
     # Update Check
     UPDATE_CHECK_INTERVAL: int = 3600  # seconds (1 hour)
+
+    # App Version
+    APP_VERSION: str = "1.0.0"
 
     # ============================================
     # APPLICATION CONFIGURATION

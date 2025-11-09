@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import { UpdateButton, OfflineIndicator } from './components';
 
 const DEFAULT_BACKEND_URL = 'http://localhost:8000';
 
@@ -84,16 +85,29 @@ const App = () => {
   // Check backend health và load conversation
   useEffect(() => {
     if (backendUrl) {
+      // Initial health check immediately
       checkBackendHealth();
+
+      // Set up periodic health checks (every 3 seconds)
+      const healthCheckInterval = setInterval(() => {
+        checkBackendHealth();
+      }, 3000);
+
+      // Load conversation and conversations
       loadConversation();
       loadConversations();
+
+      // Cleanup interval on unmount
+      return () => {
+        clearInterval(healthCheckInterval);
+      };
     }
   }, [backendUrl]);
 
   // Load danh sách conversations
   const loadConversations = async () => {
     try {
-      const response = await fetch(`${backendUrl}/conversations?user_id=${userId}`);
+      const response = await fetch(`${backendUrl}/api/v1/chat/conversations?user_id=${userId}`);
       if (response.ok) {
         const data = await response.json();
         setConversations(data.conversations || []);
@@ -119,7 +133,7 @@ const App = () => {
         setMessages(conversationMessagesRef.current.get(convId));
       } else {
         // Load từ server
-        const response = await fetch(`${backendUrl}/conversations/${convId}/history?user_id=${userId}`);
+        const response = await fetch(`${backendUrl}/api/v1/chat/conversations/${convId}/history?user_id=${userId}`);
         if (response.ok) {
           const data = await response.json();
 
@@ -154,7 +168,7 @@ const App = () => {
     }
 
     try {
-      const response = await fetch(`${backendUrl}/conversations/${convId}?user_id=${userId}`, {
+      const response = await fetch(`${backendUrl}/api/v1/chat/conversations/${convId}?user_id=${userId}`, {
         method: 'DELETE'
       });
       if (response.ok) {
@@ -178,7 +192,7 @@ const App = () => {
     if (savedConvId) {
       try {
         const response = await fetch(
-          `${backendUrl}/conversations/${savedConvId}/history?user_id=${userId}`
+          `${backendUrl}/api/v1/chat/conversations/${savedConvId}/history?user_id=${userId}`
         );
         if (response.ok) {
           const data = await response.json();
@@ -213,7 +227,7 @@ const App = () => {
   // Tạo conversation mới
   const createNewConversation = async () => {
     try {
-      const response = await fetch(`${backendUrl}/conversations/new?user_id=${userId}`);
+      const response = await fetch(`${backendUrl}/api/v1/chat/conversations/new?user_id=${userId}`);
       if (response.ok) {
         const data = await response.json();
         setConversationId(data.conversation_id);
@@ -244,10 +258,33 @@ const App = () => {
 
   const checkBackendHealth = async () => {
     try {
-      const response = await fetch(`${backendUrl}/health`);
+      const response = await fetch(`${backendUrl}/health`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+        // Add timeout
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (!response.ok) {
+        console.error(`Health check failed: ${response.status} ${response.statusText}`);
+        setBackendStatus('offline');
+        return;
+      }
+
       const data = await response.json();
-      setBackendStatus(data.ok ? 'online' : 'offline');
+      // Check both 'ok' and 'status' fields for compatibility
+      const isHealthy = data.ok === true || data.status === 'ok';
+      setBackendStatus(isHealthy ? 'online' : 'offline');
+
+      if (isHealthy) {
+        console.log('✅ Backend is online');
+      } else {
+        console.warn('⚠️ Backend health check returned unhealthy status:', data);
+      }
     } catch (error) {
+      console.error('❌ Backend health check failed:', error);
       setBackendStatus('offline');
     }
   };
@@ -259,7 +296,7 @@ const App = () => {
     let currentConvId = conversationId;
     if (!currentConvId) {
       try {
-        const convResponse = await fetch(`${backendUrl}/conversations/new?user_id=${userId}`);
+        const convResponse = await fetch(`${backendUrl}/api/v1/chat/conversations/new?user_id=${userId}`);
         if (convResponse.ok) {
           const convData = await convResponse.json();
           currentConvId = convData.conversation_id;
@@ -294,8 +331,14 @@ const App = () => {
     setMessages(newMessages);
     const assistantMessageIndex = newMessages.length - 1;
 
+    // Reload conversations list ngay để hiển thị conversation mới trong sidebar
+    // (nếu đây là message đầu tiên trong conversation mới)
+    if (messages.length === 0) {
+      await loadConversations();
+    }
+
     try {
-      const response = await fetch(`${backendUrl}/query/stream`, {
+      const response = await fetch(`${backendUrl}/api/v1/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -335,6 +378,12 @@ const App = () => {
           return prevMessages;
         });
       };
+
+      // Reload conversations list ngay khi bắt đầu stream (để hiển thị conversation mới trong sidebar)
+      // Chỉ reload nếu đây là message đầu tiên (messages.length === 0 trước khi add)
+      if (messages.length === 0) {
+        await loadConversations();
+      }
 
       while (true) {
         const { done, value } = await reader.read();
@@ -403,26 +452,11 @@ const App = () => {
                   updateConversationMessages(data.conversation_id || currentConvId, finalUpdated);
                 }
 
-                // Reload conversations list sau khi có message mới
-                loadConversations();
+                // Reload conversations list sau khi có message mới để hiển thị trong sidebar
+                await loadConversations();
 
-                // Log telemetry
-                try {
-                  await fetch(`${backendUrl}/telemetry`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      event: 'query_completed',
-                      question: userMessage.substring(0, 100),
-                      answer_length: fullAnswer.length,
-                      used_segments: data.used_segments || 0,
-                      duration_ms: data.duration_ms || 0,
-                      timestamp: new Date().toISOString()
-                    })
-                  });
-                } catch (err) {
-                  console.warn('Telemetry failed:', err);
-                }
+                // Telemetry được gửi tự động từ backend đến remote API (nếu enabled)
+                // Local backend không có endpoint /telemetry, nên không cần gọi từ frontend
               }
             } catch (err) {
               console.error('Error parsing SSE data:', err);
@@ -458,6 +492,11 @@ const App = () => {
   };
 
   return (
+    <OfflineIndicator onOnlineChange={(online) => {
+      if (!online && backendStatus === 'online') {
+        // Disable internet-dependent features when offline
+      }
+    }}>
     <div style={styles.container}>
       {/* Sidebar */}
       {sidebarOpen && (
@@ -540,6 +579,7 @@ const App = () => {
           )}
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <UpdateButton backendUrl={backendUrl} />
           <button
             onClick={createNewConversation}
             style={{
@@ -667,6 +707,7 @@ const App = () => {
       )}
       </div>
     </div>
+    </OfflineIndicator>
   );
 };
 

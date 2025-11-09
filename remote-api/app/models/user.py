@@ -30,6 +30,8 @@ class User(Base):
     published_versions = relationship("AppVersion", back_populates="publisher")
     published_packages = relationship("ModelPackage", back_populates="publisher")
     telemetry_records = relationship("Telemetry", back_populates="user")
+    feedback_submitted = relationship("Feedback", foreign_keys="Feedback.user_id", back_populates="user")
+    feedback_assigned = relationship("Feedback", foreign_keys="Feedback.assigned_to", back_populates="assignee")
 
     def to_dict(self, include_sensitive=False):
         data = {

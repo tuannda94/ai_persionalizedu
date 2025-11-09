@@ -13,6 +13,7 @@ from app.models.package import ModelPackage
 from app.models.user import User
 from app.models.version import AppVersion, UpdateLog
 from app.models.telemetry import Telemetry
+from app.models.feedback import Feedback
 
 def run_migration():
     """Create all tables including model_packages"""
@@ -28,6 +29,7 @@ def run_migration():
         print("   - update_logs")
         print("   - model_packages")
         print("   - telemetry")
+        print("   - feedback")
     except Exception as e:
         print(f"❌ Migration failed: {e}")
         raise

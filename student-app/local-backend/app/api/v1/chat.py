@@ -12,6 +12,7 @@ import time
 
 from app.database import get_db
 from app.services.rag_service import get_rag_context, get_loaded_subjects, init_rag_engine
+from app.services.cache_service import get_cached_result, set_cached_result
 from app.services.chat_service import (
     save_message, get_conversation_history, create_conversation_id,
     get_user_conversations, delete_conversation
@@ -54,12 +55,34 @@ async def query_stream(
         ]
         print(f"📜 Loaded {len(conversation_history)} messages from conversation {conversation_id}")
 
-    # Get RAG context với history
-    prompt, detected_subject, used_segments = get_rag_context(
-        req.question,
-        req.subject,
-        conversation_history=conversation_history
-    )
+    # Get RAG context với history (check cache first)
+    cached_result = get_cached_result(req.question, req.subject)
+
+    if cached_result and len(cached_result) == 3:
+        prompt, detected_subject, used_segments = cached_result
+    else:
+        prompt, detected_subject, used_segments = None, None, []
+
+    if not prompt:
+        # Cache miss, get from RAG
+        try:
+            rag_result = get_rag_context(
+                req.question,
+                req.subject,
+                conversation_history=conversation_history
+            )
+
+            if rag_result and len(rag_result) == 3:
+                prompt, detected_subject, used_segments = rag_result
+            else:
+                prompt, detected_subject, used_segments = None, None, []
+
+            # Cache result (only if successful and no conversation history to avoid stale cache)
+            if prompt and not conversation_history:
+                set_cached_result(req.question, req.subject, (prompt, detected_subject, used_segments))
+        except Exception as e:
+            print(f"❌ Error getting RAG context: {e}")
+            prompt, detected_subject, used_segments = None, None, []
 
     if not prompt:
         def error_stream():
@@ -118,11 +141,54 @@ async def query_stream(
                         except:
                             pass  # Ignore telemetry errors
 
+                    # Auto-feedback: Gửi feedback nếu response quá chậm hoặc có vấn đề
+                    if settings.FEEDBACK_ENABLED and settings.REMOTE_API_URL:
+                        try:
+                            from app.services.feedback_service import get_feedback_service
+                            feedback_service = get_feedback_service()
+
+                            # Gửi feedback nếu response time > 10s (performance issue)
+                            if duration_ms > 10000:
+                                feedback_service.send_auto_feedback(
+                                    category="performance",
+                                    title=f"Slow response: {duration_ms}ms",
+                                    message=f"Response time exceeded 10s for question: {req.question[:100]}",
+                                    conversation_id=conversation_id,
+                                    priority=3
+                                )
+                        except:
+                            pass  # Ignore feedback errors
+
                     break
         except Exception as e:
-            error_msg = f"Error: {str(e)}"
+            from app.core.errors import ChatError
+
+            # Convert to app error if needed
+            if not isinstance(e, ChatError):
+                e = ChatError(f"Error processing chat: {str(e)}")
+
+            error_msg = e.message if hasattr(e, 'message') else str(e)
             print(f"❌ {error_msg}")
-            yield f"data: {json.dumps({'error': error_msg})}\n\n"
+
+            # Auto-feedback: Gửi error feedback
+            if settings.FEEDBACK_ENABLED and settings.REMOTE_API_URL:
+                try:
+                    from app.services.feedback_service import get_feedback_service
+                    feedback_service = get_feedback_service()
+                    error_code = e.code if hasattr(e, 'code') else "CHAT_ERROR"
+                    feedback_service.send_error_feedback(
+                        error_code=error_code,
+                        error_message=error_msg,
+                        error_details=str(e),
+                        category="chat",
+                        conversation_id=conversation_id
+                    )
+                except:
+                    pass  # Ignore feedback errors
+
+            # User-friendly error message
+            user_message = "Không thể xử lý câu hỏi. Vui lòng thử lại."
+            yield f"data: {json.dumps({'error': user_message, 'error_code': getattr(e, 'code', 'CHAT_ERROR')})}\n\n"
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 

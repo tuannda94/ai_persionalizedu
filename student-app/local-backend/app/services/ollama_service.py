@@ -18,10 +18,18 @@ def stream_response(prompt: str) -> Iterator[dict]:
     ollama_url = settings.OLLAMA_URL
     ollama_model = settings.OLLAMA_MODEL
 
+    # Build system message để đảm bảo trả lời bằng tiếng Việt
+    system_message = "Bạn là trợ lý học tập AI. Luôn trả lời BẰNG TIẾNG VIỆT. Không được trả lời bằng tiếng Anh."
+
     payload = {
         "model": ollama_model,
         "prompt": prompt,
-        "stream": True
+        "system": system_message,  # Thêm system message
+        "stream": True,
+        "options": {
+            "temperature": 0.7,
+            "top_p": 0.9
+        }
     }
 
     try:
@@ -32,7 +40,8 @@ def stream_response(prompt: str) -> Iterator[dict]:
                 if line:
                     try:
                         chunk_data = json.loads(line.decode('utf-8'))
-                        token = chunk_data.get('response', '')
+                        # Ollama có thể trả về 'response' hoặc 'text' field
+                        token = chunk_data.get('response', '') or chunk_data.get('text', '')
 
                         if token:
                             yield {

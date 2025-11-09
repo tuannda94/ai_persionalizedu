@@ -5,6 +5,7 @@ import Users from './pages/Users';
 import Versions from './pages/Versions';
 import Packages from './pages/Packages';
 import Analytics from './pages/Analytics';
+import Feedback from './pages/Feedback';
 
 function App() {
   return (
@@ -34,6 +35,9 @@ function App() {
             <li style={{ marginBottom: '10px' }}>
               <Link to="/analytics" style={{ color: 'white', textDecoration: 'none' }}>Analytics</Link>
             </li>
+            <li style={{ marginBottom: '10px' }}>
+              <Link to="/feedback" style={{ color: 'white', textDecoration: 'none' }}>Feedback</Link>
+            </li>
           </ul>
         </nav>
 
@@ -45,6 +49,7 @@ function App() {
             <Route path="/versions" element={<Versions />} />
             <Route path="/packages" element={<Packages />} />
             <Route path="/analytics" element={<Analytics />} />
+            <Route path="/feedback" element={<Feedback />} />
           </Routes>
         </main>
       </div>

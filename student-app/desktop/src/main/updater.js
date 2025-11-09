@@ -248,6 +248,12 @@ ipcMain.handle('check-for-updates', async () => {
   await checkForUpdates();
 });
 
+ipcMain.handle('download-update', async () => {
+  if (mainWindow) {
+    autoUpdater.downloadUpdate();
+  }
+});
+
 ipcMain.handle('install-update', () => {
   autoUpdater.quitAndInstall();
 });

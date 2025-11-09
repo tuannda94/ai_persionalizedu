@@ -23,14 +23,21 @@ function createWindow() {
   // Start backend trước khi load app
   startBackend()
     .then(() => {
-      // Load app sau khi backend ready
-      mainWindow.loadFile(path.join(__dirname, '../../index.html'));
+      console.log('✅ Backend started successfully from Electron');
 
-      // Initialize auto-updater sau khi window ready
-      initUpdater(mainWindow);
+      // Wait a bit for backend to be fully ready
+      setTimeout(() => {
+        // Load app sau khi backend ready
+        mainWindow.loadFile(path.join(__dirname, '../../index.html'));
+
+        // Initialize auto-updater sau khi window ready
+        initUpdater(mainWindow);
+      }, 2000);
     })
     .catch((error) => {
-      console.error('Failed to start backend:', error);
+      console.error('❌ Failed to start backend:', error);
+      console.log('⚠️  Loading app anyway, backend may start later...');
+
       // Vẫn load app, nhưng sẽ hiển thị error
       mainWindow.loadFile(path.join(__dirname, '../../index.html'));
 

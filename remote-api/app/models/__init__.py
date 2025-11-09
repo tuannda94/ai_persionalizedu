@@ -5,11 +5,15 @@ from app.models.user import User
 from app.models.version import AppVersion, UpdateLog
 from app.models.telemetry import Telemetry
 from app.models.package import ModelPackage
+from app.models.feedback import Feedback, FeedbackStatus, FeedbackType
 
 __all__ = [
     "User",
     "AppVersion",
     "UpdateLog",
     "Telemetry",
-    "ModelPackage"
+    "ModelPackage",
+    "Feedback",
+    "FeedbackStatus",
+    "FeedbackType"
 ]

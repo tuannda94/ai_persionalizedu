@@ -19,7 +19,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // App info
   getVersion: () => process.versions.electron,
 
-  // IPC handlers (nếu cần)
-  // onBackendStatus: (callback) => ipcRenderer.on('backend-status', callback),
+  // Update handlers
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('download-update'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  onUpdateStatus: (callback) => {
+    ipcRenderer.on('update-status', (event, data) => callback(data));
+  },
+  onUpdateProgress: (callback) => {
+    ipcRenderer.on('update-progress', (event, data) => callback(data));
+  },
 });
 

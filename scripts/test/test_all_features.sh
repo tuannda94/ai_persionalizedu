@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Comprehensive Test Suite
-# Runs all tests for the application
+# Comprehensive Test Suite - All New Features
+# Runs all tests for newly implemented features
 
-echo "🧪 Running Comprehensive Test Suite..."
+echo "🧪 Running Comprehensive Test Suite - All Features..."
 echo "=========================================="
 echo ""
 
@@ -28,9 +28,18 @@ run_test() {
   echo -e "${BLUE}Running: $test_name${NC}"
   echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-  if bash "$test_script"; then
-    echo -e "${GREEN}✅ $test_name: PASSED${NC}"
-    ((PASSED++))
+  if bash "$test_script" 2>&1; then
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -eq 0 ]; then
+      echo -e "${GREEN}✅ $test_name: PASSED${NC}"
+      ((PASSED++))
+    elif [ $EXIT_CODE -eq 1 ]; then
+      echo -e "${RED}❌ $test_name: FAILED${NC}"
+      ((FAILED++))
+    else
+      echo -e "${YELLOW}⚠️  $test_name: WARNINGS${NC}"
+      ((WARNINGS++))
+    fi
   else
     EXIT_CODE=$?
     if [ $EXIT_CODE -eq 1 ]; then
@@ -61,17 +70,19 @@ else
 fi
 
 # Check remote API (optional)
-if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+REMOTE_API_URL="${REMOTE_API_URL:-http://localhost:8000}"
+if curl -s "${REMOTE_API_URL}/health" > /dev/null 2>&1; then
   echo -e "${GREEN}✅ Remote API is accessible${NC}"
 else
   echo -e "${YELLOW}⚠️  Remote API may not be running (some tests may fail)${NC}"
+  echo "   Start it with: cd remote-api && ./scripts/start/start_remote_api.sh"
 fi
 
 echo ""
 echo "=========================================="
 echo ""
 
-# Run all tests
+# Run all new feature tests
 run_test "Feedback Mechanism" "$SCRIPT_DIR/test_feedback.sh"
 run_test "Update Button" "$SCRIPT_DIR/test_update_button.sh"
 run_test "Offline Mode" "$SCRIPT_DIR/test_offline_mode.sh"
@@ -96,3 +107,4 @@ else
   echo -e "${RED}❌ Some tests failed. Please review the output above.${NC}"
   exit 1
 fi
+

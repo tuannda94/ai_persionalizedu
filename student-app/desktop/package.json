@@ -14,20 +14,20 @@
     "dist:linux": "npm run dist -- --linux"
   },
   "dependencies": {
-    "electron-updater": "^6.1.7",
-    "electron-log": "^5.0.1"
+    "electron-log": "^5.0.1",
+    "electron-updater": "^6.1.7"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@babel/preset-env": "^7.25.0",
     "@babel/preset-react": "^7.25.0",
     "babel-loader": "^9.1.0",
-    "electron": "^30.0.0",
-    "webpack": "^5.91.0",
-    "webpack-cli": "^5.1.4",
+    "electron": "^30.5.1",
+    "electron-builder": "^24.9.1",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "electron-builder": "^24.9.1"
+    "webpack": "^5.91.0",
+    "webpack-cli": "^5.1.4"
   },
   "build": {
     "appId": "com.fpt.ai-personalized-learning",
@@ -48,25 +48,36 @@
       {
         "from": "../backend/dist/ai-learning-backend",
         "to": "backend",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../model_packages",
         "to": "backend/model_packages",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "resources/icons/icon.ico"
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "icon": "resources/icons/icon.icns",
       "category": "public.app-category.education"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "resources/icons/icon.png",
       "category": "Education"
     },

@@ -9,7 +9,7 @@ import tarfile
 import hashlib
 import shutil
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Callable
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry

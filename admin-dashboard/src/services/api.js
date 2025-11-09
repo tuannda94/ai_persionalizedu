@@ -62,6 +62,15 @@ export const telemetryAPI = {
   stats: (days = 7) => api.get('/api/v1/telemetry/stats', { params: { days } })
 };
 
+// Feedback API
+export const feedbackAPI = {
+  list: (params) => api.get('/api/v1/feedback', { params }),
+  get: (id) => api.get(`/api/v1/feedback/${id}`),
+  create: (data) => api.post('/api/v1/feedback', data),
+  update: (id, data) => api.put(`/api/v1/feedback/${id}`, data),
+  stats: (days = 7) => api.get('/api/v1/feedback/stats/summary', { params: { days } })
+};
+
 // Packages API
 export const packagesAPI = {
   list: (subject, isActive) => api.get('/api/v1/packages/list', {

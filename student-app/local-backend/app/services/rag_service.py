@@ -128,7 +128,12 @@ def get_rag_context(
         return None, None, None
 
     # Build prompt với conversation history
-    prompt = "Bạn là một trợ lý học tập AI. Hãy trả lời câu hỏi DỰA TRÊN các đoạn văn bản sau đây. Trả lời BẰNG TIẾNG VIỆT.\n\n"
+    # System instruction - nhấn mạnh trả lời bằng tiếng Việt
+    prompt = """Bạn là một trợ lý học tập AI chuyên nghiệp. Nhiệm vụ của bạn là trả lời câu hỏi của sinh viên DỰA TRÊN các đoạn văn bản được cung cấp.
+
+QUAN TRỌNG: Bạn PHẢI trả lời BẰNG TIẾNG VIỆT. Không được trả lời bằng tiếng Anh hoặc ngôn ngữ khác.
+
+"""
 
     # Thêm conversation history nếu có (chỉ lấy 6 lượt gần nhất để không quá dài)
     if conversation_history and len(conversation_history) > 0:
