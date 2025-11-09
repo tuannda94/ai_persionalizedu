@@ -1,0 +1,67 @@
+appId: com.fpt.ai-personalized-learning
+productName: AI Personalized Learning
+directories:
+  output: dist
+  buildResources: resources
+
+files:
+  - src/**/*
+  - index.html
+  - package.json
+  - "!**/*.py"
+  - "!**/*.pyc"
+  - "!**/__pycache__/**"
+
+extraResources:
+  - from: ../backend/dist/ai-learning-backend
+    to: backend
+    filter:
+      - "**/*"
+  - from: ../model_packages
+    to: backend/model_packages
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: resources/icons/icon.ico
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  icon: resources/icons/icon.icns
+  category: public.app-category.education
+  hardenedRuntime: true
+  gatekeeperAssess: false
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  icon: resources/icons/icon.png
+  category: Education
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  installerIcon: resources/icons/icon.ico
+  uninstallerIcon: resources/icons/icon.ico
+
+# Auto-update configuration
+publish:
+  provider: generic
+  url: https://api.fpt.edu.vn/updates
+  # Or use environment variable: UPDATE_SERVER_URL
+

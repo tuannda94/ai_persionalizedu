@@ -1,73 +1,147 @@
-# Troubleshooting Guide
+# 🔧 Troubleshooting Guide
 
-## Lỗi 404 khi POST /query
+## Lỗi thường gặp
 
-### Nguyên nhân có thể:
+### 1. Backend không start
 
-1. **Backend chưa chạy**
-   - Kiểm tra: `curl http://localhost:8000/health`
-   - Nếu không có response, backend chưa chạy
-   - Giải pháp: Chạy `./start_backend.sh` hoặc `cd backend && uvicorn app:app --reload`
+**Triệu chứng**: Desktop app không kết nối được
 
-2. **URL không đúng**
-   - Mở DevTools trong Electron (View > Toggle Developer Tools)
-   - Xem Console để kiểm tra URL được gọi
-   - Kiểm tra `backendUrl` trong state
-
-3. **CORS blocking**
-   - Backend đã có CORS middleware nhưng có thể cần kiểm tra
-   - Xem Network tab trong DevTools để xem request có bị block không
-
-4. **Route không tồn tại**
-   - Kiểm tra backend console có log khi nhận request không
-   - Xem FastAPI docs: `http://localhost:8000/docs`
-
-### Cách debug:
-
-1. **Mở Electron DevTools:**
-   - Trong app, nhấn `Cmd+Option+I` (macOS) hoặc `Ctrl+Shift+I` (Windows/Linux)
-   - Hoặc trong code: `mainWindow.webContents.openDevTools()`
-
-2. **Kiểm tra Console:**
-   - Xem log "Backend URL: ..."
-   - Xem log "Sending query to: ..."
-   - Xem log "Response status: ..."
-
-3. **Kiểm tra Network tab:**
-   - Xem request có được gửi không
-   - Xem response status code
-   - Xem response body nếu có lỗi
-
-4. **Kiểm tra Backend logs:**
-   - Xem console output của backend
-   - Kiểm tra có log "🔍 Querying RAG..." không
-   - Kiểm tra có lỗi gì không
-
-### Test thủ công:
-
+**Kiểm tra**:
 ```bash
-# Test backend health
+# Kiểm tra backend có chạy không
 curl http://localhost:8000/health
 
-# Test query endpoint
-curl -X POST http://localhost:8000/query \
-  -H "Content-Type: application/json" \
-  -d '{"subject": "CS101", "question": "test"}'
+# Kiểm tra port 8000
+lsof -i :8000
 ```
 
-### Các lỗi thường gặp:
+**Giải pháp**:
+- Chạy lại: `./scripts/start/start_student_app.sh`
+- Hoặc start backend riêng:
+```bash
+cd student-app/local-backend
+source .venv/bin/activate
+uvicorn app.main:app --reload --port 8000
+```
 
-#### "Subject 'CS101' not loaded"
-- Nguyên nhân: Vector store chưa được build
-- Giải pháp: Chạy `cd data_pipeline && python embed_and_build_package.py`
+### 2. Model packages không tìm thấy
 
-#### "Ollama error: Connection refused"
-- Nguyên nhân: Ollama chưa chạy hoặc URL sai
-- Giải pháp:
-  - Kiểm tra Ollama: `ollama list`
-  - Kiểm tra OLLAMA_URL trong env
+**Triệu chứng**: RAG engine không load được subjects
 
-#### "Failed to get backend URL from electronAPI"
-- Nguyên nhân: Preload script chưa load
-- Giải pháp: Kiểm tra `preload.js` có được load trong `main.js` không
+**Kiểm tra**:
+```bash
+ls storage/model-packages/
+```
 
+**Giải pháp**:
+```bash
+./scripts/build/build_data_pipeline.sh
+```
+
+### 3. Ollama không chạy
+
+**Triệu chứng**: Chat không có response
+
+**Kiểm tra**:
+```bash
+curl http://localhost:11434/api/generate
+```
+
+**Giải pháp**:
+```bash
+ollama serve
+ollama pull llama3
+```
+
+### 4. Port conflict
+
+**Triệu chứng**: Backend không start, port đã được dùng
+
+**Giải pháp**:
+- Thay đổi port trong `student-app/local-backend/app/config.py`
+- Hoặc kill process đang dùng port:
+```bash
+lsof -ti:8000 | xargs kill
+```
+
+### 5. Dependencies chưa cài
+
+**Triệu chứng**: Import errors
+
+**Giải pháp**:
+```bash
+# Local backend
+cd student-app/local-backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Desktop
+cd student-app/desktop
+npm install
+cd renderer && npm install
+```
+
+### 6. Database errors
+
+**Triệu chứng**: SQLite errors
+
+**Giải pháp**:
+- Xóa database cũ:
+```bash
+rm student-app/local-backend/storage/databases/chat_history.db
+```
+- Backend sẽ tự tạo lại khi start
+
+### 7. Remote API không kết nối
+
+**Triệu chứng**: Authentication/telemetry fails
+
+**Kiểm tra**:
+- Remote API có chạy không
+- `.env` file có đúng không
+- DATABASE_URL và JWT_SECRET_KEY có set không
+
+**Giải pháp**:
+```bash
+cd remote-api
+# Tạo .env
+cat > .env << EOF
+DATABASE_URL=postgresql://user:pass@localhost/dbname
+JWT_SECRET_KEY=your-secret-key
+EOF
+
+./scripts/start/start_remote_api.sh
+```
+
+## Debug Tips
+
+### Check logs
+```bash
+# Local backend logs
+tail -f student-app/local-backend/storage/logs/*.log
+
+# Desktop app logs
+# Mở DevTools trong Electron (View > Toggle Developer Tools)
+```
+
+### Test endpoints
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Test chat (non-streaming)
+curl -X POST http://localhost:8000/api/v1/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{"question": "test"}'
+```
+
+### Check RAG engine
+```bash
+# Vào Python shell
+cd student-app/local-backend
+source .venv/bin/activate
+python
+>>> from app.services.rag_service import get_loaded_subjects
+>>> print(get_loaded_subjects())
+```

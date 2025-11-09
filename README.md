@@ -1,124 +1,106 @@
-# Poly Demo — AI Personalized Learning
+# 🤖 AI Personalized Learning System
 
-Ứng dụng desktop AI hỗ trợ học tập cá nhân hóa sử dụng RAG (Retrieval-Augmented Generation) và LLM local.
+Hệ thống học tập AI cá nhân hóa cho sinh viên FPT Polytechnic.
+
+## 🏗️ Kiến trúc
+
+### Local-First Architecture
+- **Toàn bộ xử lý chính chạy LOCAL trên máy sinh viên**
+- Chat, RAG, AI generation → 100% local
+- Remote API chỉ dùng cho: Authentication, Telemetry, Updates
+
+## 📁 Cấu trúc Dự án
+
+```
+AI_PersonalizedU/
+├── student-app/          # 🎓 Phần mềm sinh viên
+│   ├── desktop/         # Desktop app (Electron + React)
+│   └── local-backend/   # Local backend (FastAPI - chat, RAG, Ollama)
+│
+├── remote-api/          # 🌐 API Server của trường
+│   └── app/            # FastAPI (auth, telemetry, updates)
+│
+├── admin-dashboard/     # 👨‍💼 Web quản trị
+│   └── src/            # React dashboard
+│
+├── data-pipeline/       # 📊 Xử lý và build model packages
+│
+├── storage/             # 💾 Lưu trữ (model packages, logs)
+│
+├── scripts/             # 🔧 Build & deployment scripts
+│
+└── docs/                # 📚 Documentation
+```
+
+Xem chi tiết: [docs/FINAL_STRUCTURE.md](docs/FINAL_STRUCTURE.md)
+
+**Bắt đầu nhanh**: [docs/QUICK_START.md](docs/QUICK_START.md)
 
 ## 🚀 Quick Start
 
-### Bước 1: Build Data Pipeline (Vector Store)
+### 1. Build Data Pipeline
 ```bash
-./build_data_pipeline.sh
-# hoặc
-cd data_pipeline
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python embed_and_build_package.py
+./scripts/build/build_data_pipeline.sh
 ```
 
-### Bước 2: Cài đặt Ollama và Pull Model
+### 2. Start Student App
 ```bash
-# Cài Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# Pull model
-ollama pull mistral
-# hoặc
-ollama pull llama3
+./scripts/start/start_student_app.sh
 ```
 
-### Bước 3: Start Backend
+### 3. Start Remote API (nếu cần)
 ```bash
-./start_backend.sh
-# hoặc
-cd backend
-source .venv/bin/activate
-uvicorn app:app --reload --port 8000
+cd remote-api
+# Tạo .env với DATABASE_URL và JWT_SECRET_KEY
+./scripts/start/start_remote_api.sh
 ```
-
-### Bước 4: Start Desktop App
-```bash
-./start_desktop.sh
-# hoặc
-cd desktop
-npm install
-npm run build
-npm start
-```
-
-## 📋 Luồng hoạt động
-
-```
-Sinh viên mở app (Electron)
-    ↓
-Renderer (React) gửi câu hỏi qua FastAPI backend
-    ↓
-Backend gọi RAG engine:
-  - Lấy các đoạn văn bản gần nhất trong ChromaDB
-  - Ghép prompt
-    ↓
-Backend gửi request đến Model API (Ollama local)
-    ↓
-Model sinh câu trả lời và trả về backend
-    ↓
-Backend lưu log + gửi lại frontend hiển thị
-    ↓
-(Tùy chọn) Backend gửi telemetry về cloud server
-```
-
-## 🏗️ Cấu trúc dự án
-
-```
-poly-demo/
-├─ data_pipeline/          # Build model packages từ documents
-│  ├─ embed_and_build_package.py
-│  └─ sample_texts/        # sample_texts/CS101/*.txt, CS102/*.txt
-├─ model_packages/         # Generated: CS101_v1/, CS102_v1/
-├─ backend/                # FastAPI server
-│  ├─ app.py
-│  └─ requirements.txt
-├─ desktop/                # Electron + React app
-│  ├─ main.js
-│  └─ renderer/
-└─ docs/                   # Documentation
-```
-
-## ⚠️ Troubleshooting
-
-### Lỗi: "Subject 'CS101' not loaded. Available: []"
-
-**Nguyên nhân:** Model packages chưa được build.
-
-**Giải pháp:**
-```bash
-./build_data_pipeline.sh
-```
-
-Hoặc thủ công:
-```bash
-cd data_pipeline
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python embed_and_build_package.py
-```
-
-Sau đó restart backend.
-
-### Lỗi 404 khi POST /query
-
-Xem [docs/troubleshooting.md](docs/troubleshooting.md)
 
 ## 📚 Documentation
 
-- [Hướng dẫn chạy chi tiết](docs/run_instructions.md)
-- [Troubleshooting](docs/troubleshooting.md)
+Xem [docs/README.md](docs/README.md) để biết danh sách đầy đủ.
 
-## 📝 Notes
+**Tài liệu chính**:
+- [Quick Start](docs/QUICK_START.md) - Bắt đầu nhanh
+- [Cấu trúc Dự án](docs/FINAL_STRUCTURE.md) - Cấu trúc chi tiết
+- [Trạng thái Dự án](docs/PROJECT_STATUS.md) - Tiến độ hiện tại
+- [Kiến trúc](docs/architecture.md) - Kiến trúc hệ thống
 
-- Tất cả code là mẫu demo
-- Trước khi dùng production, cần audit bảo mật
-- Tuân thủ license của models (Mistral, Llama3, etc.)
+## 🔑 Key Points
 
-## 📄 License
+### Student App (Local)
+- ✅ Chạy trên máy sinh viên (localhost:8000)
+- ✅ Xử lý chat, RAG, Ollama (100% local)
+- ✅ Lưu conversation history (SQLite)
+- ✅ Gửi telemetry đến remote API (optional)
 
-MIT
+### Remote API (Server)
+- ✅ Chạy trên server
+- ✅ Authentication (JWT)
+- ✅ Telemetry collection
+- ✅ Version management
+- ❌ KHÔNG xử lý chat/RAG/AI
+
+## 🛠️ Development
+
+Xem [docs/](docs/) để biết chi tiết về:
+- Architecture
+- Implementation plan
+- API documentation
+- Build instructions
+
+## 📦 Build
+
+```bash
+# Build all
+./scripts/build/build_all.sh
+
+# Hoặc build từng component
+./scripts/build/build_student_app.sh
+```
+
+## 🔒 Security
+
+- JWT authentication
+- Local data encryption
+- HTTPS for remote API
+- Input validation

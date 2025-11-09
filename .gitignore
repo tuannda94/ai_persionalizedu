@@ -4,39 +4,22 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
-.venv
 *.egg-info/
 dist/
 build/
-*.egg
+.venv/
+venv/
+ENV/
+env/
 
 # Node
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+package-lock.json
 
-# Electron
-desktop/dist/
-desktop/renderer/build/
-desktop/renderer/.env.local
-desktop/renderer/.env.development.local
-desktop/renderer/.env.test.local
-desktop/renderer/.env.production.local
-
-# Model packages (generated)
-model_packages/
-
-# ChromaDB
-data_pipeline/vector_store/
-*.db
-*.sqlite
-
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
@@ -47,23 +30,48 @@ data_pipeline/vector_store/
 .DS_Store
 Thumbs.db
 
-# Environment
-.env
-.env.local
-*.env
+# Databases
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
 
 # Logs
 *.log
 logs/
 telemetry.log
+query.log
 
-# Conversation history database
-backend/chat_history.db
-backend/chat_history.db-journal
+# Environment
+.env
+.env.local
+.env.*.local
 
-# Model files (nếu có)
-*.bin
-*.pt
-*.pth
-models/
+# Build outputs
+dist/
+build/
+*.spec.bak
 
+# Storage (local)
+student-app/local-backend/storage/
+remote-api/storage/
+
+# Model packages (large files)
+storage/model-packages/**/*.jsonl
+
+# Temporary files
+*.tmp
+*.bak
+*.old
+
+# Electron
+desktop/dist/
+student-app/desktop/dist/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Misc
+.pytest_cache/
+.mypy_cache/

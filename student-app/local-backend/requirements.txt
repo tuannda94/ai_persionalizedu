@@ -1,0 +1,10 @@
+# Local Backend - Student App
+# Chỉ dependencies cần thiết cho local backend
+
+fastapi
+uvicorn[standard]
+chromadb
+requests
+sqlalchemy
+pydantic-settings
+python-dotenv

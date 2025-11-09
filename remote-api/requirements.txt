@@ -1,0 +1,13 @@
+# Remote API Server
+# Dependencies cho server (PostgreSQL, production)
+
+fastapi
+uvicorn[standard]
+sqlalchemy
+alembic
+psycopg2-binary
+python-jose[cryptography]
+passlib[bcrypt]
+pydantic-settings
+python-dotenv
+email-validator
