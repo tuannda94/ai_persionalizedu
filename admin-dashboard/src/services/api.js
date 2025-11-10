@@ -3,7 +3,7 @@
  */
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -20,6 +20,119 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Handle 401 errors - auto refresh token or redirect to login
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // If 401 and not already retrying
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        // If already refreshing, queue this request
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then(token => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch(err => {
+            return Promise.reject(err);
+          });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      const refreshToken = localStorage.getItem('refresh_token');
+
+      if (refreshToken) {
+        try {
+          // Try to refresh token
+          const response = await api.post('/api/v1/auth/refresh', {
+            refresh_token: refreshToken
+          });
+
+          const { access_token } = response.data;
+          localStorage.setItem('access_token', access_token);
+
+          // Update original request header
+          originalRequest.headers.Authorization = `Bearer ${access_token}`;
+
+          // Process queued requests
+          processQueue(null, access_token);
+          isRefreshing = false;
+
+          // Retry original request
+          return api(originalRequest);
+        } catch (refreshError) {
+          // Refresh failed - logout and redirect
+          processQueue(refreshError, null);
+          isRefreshing = false;
+
+          // Clear auth data
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user');
+
+          // Redirect to login
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
+
+          return Promise.reject(refreshError);
+        }
+      } else {
+        // No refresh token - logout immediately
+        isRefreshing = false;
+
+        // Clear auth data
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+
+        // Redirect to login
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+
+        return Promise.reject(error);
+      }
+    }
+
+    // For other errors, show user-friendly message
+    if (error.response) {
+      const status = error.response.status;
+      const detail = error.response.data?.detail || error.message;
+
+      // Log error with context
+      console.error(`API Error [${status}]:`, {
+        url: originalRequest?.url,
+        method: originalRequest?.method,
+        detail: detail,
+        fullError: error
+      });
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 // Auth API
 export const authAPI = {

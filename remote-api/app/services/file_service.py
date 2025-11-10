@@ -19,11 +19,13 @@ from app.services.minio_service import get_minio_service
 STORAGE_ROOT = Path(settings.STORAGE_ROOT) if hasattr(settings, 'STORAGE_ROOT') else Path("storage")
 INSTALLERS_DIR = STORAGE_ROOT / "installers"
 PACKAGES_DIR = STORAGE_ROOT / "packages"
+DOCUMENTS_DIR = STORAGE_ROOT / "documents"
 
 # Create directories if not exist (for local storage)
 if settings.STORAGE_TYPE == "local":
     INSTALLERS_DIR.mkdir(parents=True, exist_ok=True)
     PACKAGES_DIR.mkdir(parents=True, exist_ok=True)
+    DOCUMENTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def calculate_file_hash(file_data: bytes) -> str:
@@ -87,8 +89,10 @@ async def save_uploaded_file(
             bucket = settings.MINIO_BUCKET_INSTALLERS
         elif subdirectory == "packages":
             bucket = settings.MINIO_BUCKET_PACKAGES
+        elif subdirectory == "documents":
+            bucket = getattr(settings, 'MINIO_BUCKET_DOCUMENTS', 'documents')
         else:
-            raise ValueError(f"Invalid subdirectory: {subdirectory}")
+            bucket = getattr(settings, f'MINIO_BUCKET_{subdirectory.upper()}', subdirectory)
 
         # Upload to MinIO
         object_name = f"{subdirectory}/{filename}"
@@ -115,6 +119,8 @@ async def save_uploaded_file(
             storage_dir = INSTALLERS_DIR
         elif subdirectory == "packages":
             storage_dir = PACKAGES_DIR
+        elif subdirectory == "documents":
+            storage_dir = DOCUMENTS_DIR
         else:
             raise ValueError(f"Invalid subdirectory: {subdirectory}")
 
@@ -157,8 +163,10 @@ def get_download_url(filename: str, subdirectory: str, use_presigned: bool = Tru
             bucket = settings.MINIO_BUCKET_INSTALLERS
         elif subdirectory == "packages":
             bucket = settings.MINIO_BUCKET_PACKAGES
+        elif subdirectory == "documents":
+            bucket = getattr(settings, 'MINIO_BUCKET_DOCUMENTS', 'documents')
         else:
-            raise ValueError(f"Invalid subdirectory: {subdirectory}")
+            bucket = getattr(settings, f'MINIO_BUCKET_{subdirectory.upper()}', subdirectory)
 
         # Use object name directly if it's already a path
         object_name = filename if "/" in filename else f"{subdirectory}/{filename}"
@@ -244,8 +252,10 @@ def get_file_data(filename: str, subdirectory: str) -> bytes:
             bucket = settings.MINIO_BUCKET_INSTALLERS
         elif subdirectory == "packages":
             bucket = settings.MINIO_BUCKET_PACKAGES
+        elif subdirectory == "documents":
+            bucket = getattr(settings, 'MINIO_BUCKET_DOCUMENTS', 'documents')
         else:
-            raise ValueError(f"Invalid subdirectory: {subdirectory}")
+            bucket = getattr(settings, f'MINIO_BUCKET_{subdirectory.upper()}', subdirectory)
 
         # Use object name directly if it's already a path
         object_name = filename if "/" in filename else f"{subdirectory}/{filename}"
@@ -283,8 +293,10 @@ def delete_file(filename: str, subdirectory: str) -> bool:
             bucket = settings.MINIO_BUCKET_INSTALLERS
         elif subdirectory == "packages":
             bucket = settings.MINIO_BUCKET_PACKAGES
+        elif subdirectory == "documents":
+            bucket = getattr(settings, 'MINIO_BUCKET_DOCUMENTS', 'documents')
         else:
-            raise ValueError(f"Invalid subdirectory: {subdirectory}")
+            bucket = getattr(settings, f'MINIO_BUCKET_{subdirectory.upper()}', subdirectory)
 
         # Use object name directly if it's already a path
         object_name = filename if "/" in filename else f"{subdirectory}/{filename}"

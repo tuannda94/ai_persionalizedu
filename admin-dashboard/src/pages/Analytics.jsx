@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { telemetryAPI, feedbackAPI } from '../services/api';
+import { handleApiError, shouldShowError } from '../utils/errorHandler';
 
 function Analytics() {
   const [telemetryStats, setTelemetryStats] = useState(null);
@@ -22,7 +23,12 @@ function Analytics() {
       setFeedbackStats(feedbackRes.data);
     } catch (error) {
       console.error('Failed to load stats:', error);
-      alert('Failed to load analytics');
+      if (shouldShowError(error)) {
+        const message = handleApiError(error, 'Failed to load analytics');
+        if (message) {
+          alert(message);
+        }
+      }
     } finally {
       setLoading(false);
     }

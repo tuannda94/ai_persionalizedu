@@ -2,9 +2,10 @@
 Update Management API Endpoints - Remote API
 Quản lý versions và update checks
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from typing import Optional, List
 
 from app.database import get_db
 from app.models.version import AppVersion, UpdateLog

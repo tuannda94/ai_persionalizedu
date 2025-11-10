@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_database
-from app.api.v1 import chat, packages, feedback
+from app.api.v1 import chat, packages, feedback, offline_logs
 from app.services.rag_service import init_rag_engine, get_loaded_subjects
 
 app = FastAPI(title="Student App - Local Backend")
@@ -27,6 +27,7 @@ app.add_middleware(
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(packages.router, prefix="/api/v1")
 app.include_router(feedback.router, prefix="/api/v1")
+app.include_router(offline_logs.router, prefix="/api/v1")
 
 # Startup event
 @app.on_event("startup")

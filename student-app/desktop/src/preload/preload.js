@@ -17,7 +17,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPlatform: () => process.platform,
 
   // App info
-  getVersion: () => process.versions.electron,
+  getVersion: () => {
+    // Get app version from package.json
+    try {
+      const pkg = require('../../package.json');
+      return pkg.version || '1.0.0';
+    } catch {
+      return '1.0.0';
+    }
+  },
 
   // Update handlers
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),

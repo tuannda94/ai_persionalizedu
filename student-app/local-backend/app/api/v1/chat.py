@@ -93,13 +93,26 @@ async def query_stream(
 
     def stream():
         full_answer = ""
+        user_message_saved = False
+        assistant_message_saved = False
         try:
             # Lưu user message trước
-            save_message(db, user_id, conversation_id, "user", req.question)
+            try:
+                save_message(db, user_id, conversation_id, "user", req.question)
+                user_message_saved = True
+            except Exception as save_err:
+                print(f"⚠️  Failed to save user message: {save_err}")
 
             # Stream từ Ollama
             for chunk in stream_response(prompt):
                 if 'error' in chunk:
+                    # Save partial answer nếu có
+                    if full_answer and not assistant_message_saved:
+                        try:
+                            save_message(db, user_id, conversation_id, "assistant", full_answer)
+                            assistant_message_saved = True
+                        except Exception as save_err:
+                            print(f"⚠️  Failed to save partial assistant message: {save_err}")
                     yield f"data: {json.dumps({'error': chunk['error']})}\n\n"
                     break
 
@@ -109,7 +122,12 @@ async def query_stream(
 
                 if chunk.get('done', False):
                     # Lưu assistant response
-                    save_message(db, user_id, conversation_id, "assistant", full_answer)
+                    if not assistant_message_saved:
+                        try:
+                            save_message(db, user_id, conversation_id, "assistant", full_answer)
+                            assistant_message_saved = True
+                        except Exception as save_err:
+                            print(f"⚠️  Failed to save assistant message: {save_err}")
 
                     duration_ms = int((time.time() - start_time) * 1000)
                     yield f"data: {json.dumps({
@@ -162,6 +180,15 @@ async def query_stream(
                     break
         except Exception as e:
             from app.core.errors import ChatError
+
+            # Save partial answer nếu có (trước khi xử lý error)
+            if full_answer and not assistant_message_saved:
+                try:
+                    save_message(db, user_id, conversation_id, "assistant", full_answer)
+                    assistant_message_saved = True
+                    print(f"💾 Saved partial assistant message ({len(full_answer)} chars) after error")
+                except Exception as save_err:
+                    print(f"⚠️  Failed to save partial assistant message after error: {save_err}")
 
             # Convert to app error if needed
             if not isinstance(e, ChatError):

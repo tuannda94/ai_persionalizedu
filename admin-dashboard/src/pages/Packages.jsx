@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { packagesAPI } from '../services/api';
+import { handleApiError, shouldShowError } from '../utils/errorHandler';
 
 function Packages() {
   const [packages, setPackages] = useState([]);
@@ -27,7 +28,12 @@ function Packages() {
       setPackages(response.data || []);
     } catch (error) {
       console.error('Failed to load packages:', error);
-      alert('Failed to load packages');
+      if (shouldShowError(error)) {
+        const message = handleApiError(error, 'Failed to load packages');
+        if (message) {
+          alert(message);
+        }
+      }
     } finally {
       setLoading(false);
     }

@@ -40,7 +40,11 @@ class MinIOService:
         if not self.client:
             return
 
-        buckets = [self.bucket_installers, self.bucket_packages]
+        buckets = [
+            self.bucket_installers,
+            self.bucket_packages,
+            getattr(settings, 'MINIO_BUCKET_DOCUMENTS', 'documents')
+        ]
         for bucket in buckets:
             try:
                 if not self.client.bucket_exists(bucket):
@@ -181,6 +185,18 @@ class MinIOService:
             return [obj.object_name for obj in objects]
         except S3Error as e:
             print(f"⚠️  Failed to list files: {e}")
+            return []
+
+    def list_objects(self, bucket: str, prefix: str = "") -> list:
+        """List objects in bucket with full metadata"""
+        if not self.client:
+            return []
+
+        try:
+            objects = self.client.list_objects(bucket, prefix=prefix, recursive=True)
+            return list(objects)  # Return full object info
+        except S3Error as e:
+            print(f"⚠️  Failed to list objects: {e}")
             return []
 
 

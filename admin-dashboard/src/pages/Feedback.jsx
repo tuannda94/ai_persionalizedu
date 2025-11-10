@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { feedbackAPI } from '../services/api';
+import { handleApiError, shouldShowError } from '../utils/errorHandler';
 
 function Feedback() {
   const [feedbacks, setFeedbacks] = useState([]);
@@ -32,7 +33,12 @@ function Feedback() {
       setTotalPages(response.data.total_pages || 1);
     } catch (error) {
       console.error('Failed to load feedbacks:', error);
-      alert('Failed to load feedbacks');
+      if (shouldShowError(error)) {
+        const message = handleApiError(error, 'Failed to load feedbacks');
+        if (message) {
+          alert(message);
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -61,7 +67,12 @@ function Feedback() {
       alert('Feedback updated successfully');
     } catch (error) {
       console.error('Failed to update feedback:', error);
-      alert('Failed to update feedback');
+      if (shouldShowError(error)) {
+        const message = handleApiError(error, 'Failed to update feedback');
+        if (message) {
+          alert(message);
+        }
+      }
     }
   };
 

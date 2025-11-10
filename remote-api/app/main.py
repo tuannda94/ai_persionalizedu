@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_database, get_db
-from app.api.v1 import auth, telemetry, updates, files, packages, feedback
+from app.api.v1 import auth, telemetry, updates, files, packages, feedback, users, documents
 from app.models.user import User
 from app.core.security import get_password_hash
 
@@ -31,6 +31,8 @@ app.include_router(updates.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
 app.include_router(packages.router, prefix="/api/v1")
 app.include_router(feedback.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(documents.router, prefix="/api/v1")
 
 # Startup event
 @app.on_event("startup")

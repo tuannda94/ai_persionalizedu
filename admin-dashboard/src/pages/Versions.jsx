@@ -32,7 +32,10 @@ function Versions() {
       setVersions(response.data || []);
     } catch (error) {
       console.error('Failed to load versions:', error);
-      alert('Failed to load versions');
+      // Don't show alert if it's a 401 - interceptor will handle redirect
+      if (error.response?.status !== 401) {
+        alert('Failed to load versions: ' + (error.response?.data?.detail || error.message || 'Unknown error'));
+      }
     } finally {
       setLoading(false);
     }

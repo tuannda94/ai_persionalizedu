@@ -23,8 +23,8 @@ class Settings(BaseSettings):
 
     JWT_SECRET_KEY: str  # Required for production
     JWT_ALGORITHM: str = "HS256"
-    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours (increased from 30 minutes)
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 30  # 30 days (increased from 7 days)
 
     # ============================================
     # CORS CONFIGURATION
@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     MINIO_SECURE: bool = False  # Use HTTPS (True) or HTTP (False)
     MINIO_BUCKET_INSTALLERS: str = "installers"  # Bucket for app installers
     MINIO_BUCKET_PACKAGES: str = "packages"  # Bucket for model packages
+    MINIO_BUCKET_DOCUMENTS: str = "documents"  # Bucket for documents
 
     # AWS S3 Configuration (alternative to MinIO)
     S3_BUCKET: Optional[str] = None

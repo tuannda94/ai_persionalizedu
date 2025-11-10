@@ -206,6 +206,14 @@ const App = () => {
                 content: msg.message || ''
               }));
             setMessages(historyMessages);
+            // Lưu vào cache
+            conversationMessagesRef.current.set(savedConvId, historyMessages);
+            // Backup vào localStorage
+            try {
+              localStorage.setItem(`messages_${savedConvId}`, JSON.stringify(historyMessages));
+            } catch (e) {
+              console.warn('Failed to backup messages to localStorage:', e);
+            }
             console.log(`📜 Loaded ${historyMessages.length} messages from conversation ${savedConvId}`);
           } else {
             // Conversation rỗng, tạo mới
@@ -217,7 +225,21 @@ const App = () => {
         }
       } catch (error) {
         console.error('Error loading conversation:', error);
-        createNewConversation();
+        // Thử load từ localStorage backup
+        try {
+          const backupMessages = localStorage.getItem(`messages_${savedConvId}`);
+          if (backupMessages) {
+            const parsed = JSON.parse(backupMessages);
+            setMessages(parsed);
+            conversationMessagesRef.current.set(savedConvId, parsed);
+            console.log(`📦 Loaded ${parsed.length} messages from localStorage backup`);
+          } else {
+            createNewConversation();
+          }
+        } catch (e) {
+          console.error('Error loading from backup:', e);
+          createNewConversation();
+        }
       }
     } else {
       createNewConversation();
@@ -366,6 +388,13 @@ const App = () => {
       const updateConversationMessages = (convId, updatedMessages) => {
         // Lưu vào cache
         conversationMessagesRef.current.set(convId, updatedMessages);
+
+        // Backup vào localStorage
+        try {
+          localStorage.setItem(`messages_${convId}`, JSON.stringify(updatedMessages));
+        } catch (e) {
+          console.warn('Failed to backup messages to localStorage:', e);
+        }
 
         // Nếu đang xem conversation này, update UI
         // Sử dụng functional update để tránh stale closure
