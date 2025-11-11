@@ -55,6 +55,31 @@ class FeedbackResponse(BaseModel):
     updated_at: Optional[str]
     resolved_at: Optional[str]
 
+    @classmethod
+    def from_orm(cls, obj):
+        """Convert ORM object to response, handling UUID and datetime conversion"""
+        return cls(
+            id=str(obj.id),
+            user_id=str(obj.user_id) if obj.user_id else None,
+            type=obj.type.value if hasattr(obj.type, 'value') else str(obj.type),
+            category=obj.category,
+            title=obj.title,
+            message=obj.message,
+            app_version=obj.app_version,
+            platform=obj.platform,
+            conversation_id=obj.conversation_id,
+            error_code=obj.error_code,
+            error_details=obj.error_details,
+            status=obj.status.value if hasattr(obj.status, 'value') else str(obj.status),
+            priority=obj.priority,
+            assigned_to=str(obj.assigned_to) if obj.assigned_to else None,
+            admin_notes=obj.admin_notes,
+            resolution=obj.resolution,
+            created_at=obj.created_at.isoformat() if obj.created_at else None,
+            updated_at=obj.updated_at.isoformat() if obj.updated_at else None,
+            resolved_at=obj.resolved_at.isoformat() if obj.resolved_at else None,
+        )
+
     class Config:
         from_attributes = True
 

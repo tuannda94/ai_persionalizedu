@@ -6,8 +6,8 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, status, Request
+from fastapi.security import OAuth2PasswordBearer, HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,7 +15,8 @@ from app.models.user import User
 from app.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
+http_bearer = HTTPBearer(auto_error=False)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -100,6 +101,32 @@ async def get_current_user(
         )
 
     return user
+
+
+async def get_optional_user(
+    request: Request,
+    db: Session
+) -> Optional[User]:
+    """Get current user if authenticated, otherwise return None (for optional auth endpoints)"""
+    try:
+        # Get token from Authorization header manually
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.replace("Bearer ", "")
+            try:
+                payload = decode_token(token)
+                user_id: str = payload.get("sub")
+                if user_id:
+                    user = db.query(User).filter(User.id == user_id).first()
+                    if user and user.is_active:
+                        return user
+            except (HTTPException, JWTError):
+                # Token invalid - return None
+                pass
+    except Exception:
+        # Any other error - return None
+        pass
+    return None
 
 
 async def get_current_admin_user(

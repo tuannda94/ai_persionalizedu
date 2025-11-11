@@ -1,24 +1,23 @@
 import React, { useState, useEffect } from 'react';
+import { Table, Button, Modal, Form, Input, Select, Space, Tag, message, Card } from 'antd';
+import { UserOutlined, PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { usersAPI } from '../services/api';
+import { handleApiError, shouldShowError } from '../utils/errorHandler';
+
+const { Option } = Select;
 
 function Users() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
   const [filters, setFilters] = useState({
     role: '',
     is_active: ''
   });
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    full_name: '',
-    student_id: '',
-    role: 'student',
-    is_active: true
-  });
-  const [editFormData, setEditFormData] = useState({});
+  const [createForm] = Form.useForm();
+  const [editForm] = Form.useForm();
 
   useEffect(() => {
     loadUsers();
@@ -27,436 +26,355 @@ function Users() {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const params = {};
-      if (filters.role) params.role = filters.role;
-      if (filters.is_active !== '') params.is_active = filters.is_active === 'true';
-
       const response = await usersAPI.list();
-      setUsers(response.data || []);
+      let filteredUsers = response.data || [];
+
+      if (filters.role) {
+        filteredUsers = filteredUsers.filter(u => u.role === filters.role);
+      }
+      if (filters.is_active !== '') {
+        filteredUsers = filteredUsers.filter(u => u.is_active === (filters.is_active === 'true'));
+      }
+
+      setUsers(filteredUsers);
     } catch (error) {
       console.error('Failed to load users:', error);
-      // Don't show alert if it's a 401 - interceptor will handle redirect
-      if (error.response?.status !== 401) {
-        alert('Failed to load users: ' + (error.response?.data?.detail || error.message || 'Unknown error'));
+      if (shouldShowError(error)) {
+        const errorMsg = handleApiError(error, 'Failed to load users');
+        if (errorMsg) {
+          message.error(errorMsg);
+        }
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateUser = async (e) => {
-    e.preventDefault();
+  const handleCreate = async (values) => {
     try {
-      await usersAPI.create(formData);
-      alert('User created successfully');
-      setShowCreateForm(false);
-      setFormData({
-        email: '',
-        password: '',
-        full_name: '',
-        student_id: '',
-        role: 'student',
-        is_active: true
-      });
+      await usersAPI.create(values);
+      message.success('User created successfully');
+      setCreateModalVisible(false);
+      createForm.resetFields();
       loadUsers();
     } catch (error) {
       console.error('Failed to create user:', error);
-      alert('Failed to create user: ' + (error.response?.data?.detail || error.message));
+      if (shouldShowError(error)) {
+        const errorMsg = handleApiError(error, 'Failed to create user');
+        if (errorMsg) {
+          message.error(errorMsg);
+        }
+      }
     }
   };
 
-  const handleUpdateUser = async (userId) => {
+  const handleUpdate = async (values) => {
     try {
-      await usersAPI.update(userId, editFormData);
-      alert('User updated successfully');
+      await usersAPI.update(selectedUser.id, values);
+      message.success('User updated successfully');
+      setEditModalVisible(false);
       setSelectedUser(null);
-      setEditFormData({});
+      editForm.resetFields();
       loadUsers();
     } catch (error) {
       console.error('Failed to update user:', error);
-      alert('Failed to update user: ' + (error.response?.data?.detail || error.message));
+      if (shouldShowError(error)) {
+        const errorMsg = handleApiError(error, 'Failed to update user');
+        if (errorMsg) {
+          message.error(errorMsg);
+        }
+      }
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    if (!confirm('Are you sure you want to delete this user?')) {
-      return;
-    }
-    try {
-      await usersAPI.delete(userId);
-      alert('User deleted successfully');
-      loadUsers();
-    } catch (error) {
-      console.error('Failed to delete user:', error);
-      alert('Failed to delete user: ' + (error.response?.data?.detail || error.message));
-    }
+  const handleDelete = async (userId) => {
+    Modal.confirm({
+      title: 'Are you sure you want to delete this user?',
+      content: 'This action cannot be undone.',
+      okText: 'Yes, Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        try {
+          await usersAPI.delete(userId);
+          message.success('User deleted successfully');
+          loadUsers();
+        } catch (error) {
+          console.error('Failed to delete user:', error);
+          if (shouldShowError(error)) {
+            const errorMsg = handleApiError(error, 'Failed to delete user');
+            if (errorMsg) {
+              message.error(errorMsg);
+            }
+          }
+        }
+      }
+    });
   };
 
-  const openEditForm = (user) => {
+  const openEditModal = (user) => {
     setSelectedUser(user);
-    setEditFormData({
+    editForm.setFieldsValue({
       full_name: user.full_name || '',
       student_id: user.student_id || '',
       role: user.role || 'student',
       is_active: user.is_active !== undefined ? user.is_active : true
     });
+    setEditModalVisible(true);
   };
 
-  const getRoleColor = (role) => {
-    const colors = {
-      admin: '#ef4444',
-      student: '#3b82f6'
-    };
-    return colors[role] || '#6b7280';
-  };
+  const columns = [
+    {
+      title: 'Email',
+      dataIndex: 'email',
+      key: 'email',
+      sorter: (a, b) => a.email.localeCompare(b.email),
+    },
+    {
+      title: 'Full Name',
+      dataIndex: 'full_name',
+      key: 'full_name',
+    },
+    {
+      title: 'Student ID',
+      dataIndex: 'student_id',
+      key: 'student_id',
+    },
+    {
+      title: 'Role',
+      dataIndex: 'role',
+      key: 'role',
+      render: (role) => (
+        <Tag color={role === 'admin' ? 'red' : 'blue'}>
+          {role?.toUpperCase() || 'STUDENT'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'is_active',
+      key: 'is_active',
+      render: (isActive) => (
+        <Tag color={isActive ? 'green' : 'default'}>
+          {isActive ? 'Active' : 'Inactive'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button
+            type="link"
+            icon={<EditOutlined />}
+            onClick={() => openEditModal(record)}
+          >
+            Edit
+          </Button>
+          <Button
+            type="link"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record.id)}
+          >
+            Delete
+          </Button>
+        </Space>
+      ),
+    },
+  ];
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1>Users Management</h1>
-        <button
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer'
-          }}
-        >
-          {showCreateForm ? 'Cancel' : '+ Create User'}
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div style={{
-        display: 'flex',
-        gap: '10px',
-        marginBottom: '20px',
-        padding: '15px',
-        backgroundColor: '#f3f4f6',
-        borderRadius: '5px'
-      }}>
-        <select
-          value={filters.role}
-          onChange={(e) => setFilters({ ...filters, role: e.target.value })}
-          style={{ padding: '8px', borderRadius: '5px', border: '1px solid #d1d5db' }}
-        >
-          <option value="">All Roles</option>
-          <option value="admin">Admin</option>
-          <option value="student">Student</option>
-        </select>
-        <select
-          value={filters.is_active}
-          onChange={(e) => setFilters({ ...filters, is_active: e.target.value })}
-          style={{ padding: '8px', borderRadius: '5px', border: '1px solid #d1d5db' }}
-        >
-          <option value="">All Status</option>
-          <option value="true">Active</option>
-          <option value="false">Inactive</option>
-        </select>
-        <button
-          onClick={() => setFilters({ role: '', is_active: '' })}
-          style={{
-            padding: '8px 15px',
-            backgroundColor: '#6b7280',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer'
-          }}
-        >
-          Clear Filters
-        </button>
-      </div>
-
-      {/* Create Form */}
-      {showCreateForm && (
-        <div style={{
-          marginBottom: '20px',
-          padding: '20px',
-          backgroundColor: '#f9fafb',
-          borderRadius: '5px',
-          border: '1px solid #e5e7eb'
-        }}>
-          <h2>Create New User</h2>
-          <form onSubmit={handleCreateUser}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-              <div>
-                <label>Email *</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
-                  style={{ width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #d1d5db' }}
-                />
-              </div>
-              <div>
-                <label>Password *</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
-                  minLength={6}
-                  style={{ width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #d1d5db' }}
-                />
-              </div>
-              <div>
-                <label>Full Name</label>
-                <input
-                  type="text"
-                  value={formData.full_name}
-                  onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #d1d5db' }}
-                />
-              </div>
-              <div>
-                <label>Student ID</label>
-                <input
-                  type="text"
-                  value={formData.student_id}
-                  onChange={(e) => setFormData({ ...formData, student_id: e.target.value })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #d1d5db' }}
-                />
-              </div>
-              <div>
-                <label>Role</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #d1d5db' }}
-                >
-                  <option value="student">Student</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-            </div>
-            <button
-              type="submit"
-              style={{
-                padding: '10px 20px',
-                backgroundColor: '#10b981',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer'
-              }}
-            >
-              Create User
-            </button>
-          </form>
+    <div>
+      <Card>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h2 style={{ margin: 0 }}>Users Management</h2>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setCreateModalVisible(true)}
+          >
+            Create User
+          </Button>
         </div>
-      )}
 
-      {/* Users Table */}
-      {loading ? (
-        <div>Loading...</div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f3f4f6' }}>
-                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Email</th>
-                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Full Name</th>
-                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Student ID</th>
-                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Role</th>
-                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Status</th>
-                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Last Login</th>
-                <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.length === 0 ? (
-                <tr>
-                  <td colSpan="7" style={{ padding: '20px', textAlign: 'center', color: '#6b7280' }}>
-                    No users found
-                  </td>
-                </tr>
-              ) : (
-                users.map((user) => (
-                  <tr key={user.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                    <td style={{ padding: '12px' }}>{user.email}</td>
-                    <td style={{ padding: '12px' }}>{user.full_name || '-'}</td>
-                    <td style={{ padding: '12px' }}>{user.student_id || '-'}</td>
-                    <td style={{ padding: '12px' }}>
-                      <span style={{
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        backgroundColor: getRoleColor(user.role) + '20',
-                        color: getRoleColor(user.role),
-                        fontSize: '12px',
-                        fontWeight: 'bold'
-                      }}>
-                        {user.role}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px' }}>
-                      <span style={{
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        backgroundColor: user.is_active ? '#10b98120' : '#ef444420',
-                        color: user.is_active ? '#10b981' : '#ef4444',
-                        fontSize: '12px',
-                        fontWeight: 'bold'
-                      }}>
-                        {user.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px' }}>
-                      {user.last_login ? new Date(user.last_login).toLocaleDateString() : '-'}
-                    </td>
-                    <td style={{ padding: '12px' }}>
-                      <div style={{ display: 'flex', gap: '5px' }}>
-                        <button
-                          onClick={() => openEditForm(user)}
-                          style={{
-                            padding: '5px 10px',
-                            backgroundColor: '#3b82f6',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                            fontSize: '12px'
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          style={{
-                            padding: '5px 10px',
-                            backgroundColor: '#ef4444',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                            fontSize: '12px'
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
+        {/* Filters */}
+        <Space style={{ marginBottom: 16 }}>
+          <Select
+            placeholder="Filter by Role"
+            style={{ width: 150 }}
+            allowClear
+            value={filters.role || undefined}
+            onChange={(value) => setFilters({ ...filters, role: value || '' })}
+          >
+            <Option value="admin">Admin</Option>
+            <Option value="student">Student</Option>
+          </Select>
+          <Select
+            placeholder="Filter by Status"
+            style={{ width: 150 }}
+            allowClear
+            value={filters.is_active !== '' ? filters.is_active : undefined}
+            onChange={(value) => setFilters({ ...filters, is_active: value !== undefined ? value : '' })}
+          >
+            <Option value="true">Active</Option>
+            <Option value="false">Inactive</Option>
+          </Select>
+        </Space>
+
+        <Table
+          columns={columns}
+          dataSource={users}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total) => `Total ${total} users`,
+          }}
+        />
+      </Card>
+
+      {/* Create Modal */}
+      <Modal
+        title="Create New User"
+        open={createModalVisible}
+        onCancel={() => {
+          setCreateModalVisible(false);
+          createForm.resetFields();
+        }}
+        footer={null}
+      >
+        <Form
+          form={createForm}
+          layout="vertical"
+          onFinish={handleCreate}
+        >
+          <Form.Item
+            name="email"
+            label="Email"
+            rules={[
+              { required: true, message: 'Please input email!' },
+              { type: 'email', message: 'Please input valid email!' }
+            ]}
+          >
+            <Input prefix={<UserOutlined />} />
+          </Form.Item>
+          <Form.Item
+            name="password"
+            label="Password"
+            rules={[{ required: true, message: 'Please input password!', min: 6 }]}
+          >
+            <Input.Password />
+          </Form.Item>
+          <Form.Item
+            name="full_name"
+            label="Full Name"
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="student_id"
+            label="Student ID"
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="role"
+            label="Role"
+            initialValue="student"
+          >
+            <Select>
+              <Option value="student">Student</Option>
+              <Option value="admin">Admin</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit">
+                Create
+              </Button>
+              <Button onClick={() => {
+                setCreateModalVisible(false);
+                createForm.resetFields();
+              }}>
+                Cancel
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
 
       {/* Edit Modal */}
-      {selectedUser && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            padding: '30px',
-            borderRadius: '10px',
-            width: '500px',
-            maxHeight: '80vh',
-            overflowY: 'auto'
-          }}>
-            <h2>Edit User: {selectedUser.email}</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginTop: '20px' }}>
-              <div>
-                <label>Full Name</label>
-                <input
-                  type="text"
-                  value={editFormData.full_name || ''}
-                  onChange={(e) => setEditFormData({ ...editFormData, full_name: e.target.value })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #d1d5db' }}
-                />
-              </div>
-              <div>
-                <label>Student ID</label>
-                <input
-                  type="text"
-                  value={editFormData.student_id || ''}
-                  onChange={(e) => setEditFormData({ ...editFormData, student_id: e.target.value })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #d1d5db' }}
-                />
-              </div>
-              <div>
-                <label>Role</label>
-                <select
-                  value={editFormData.role || 'student'}
-                  onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #d1d5db' }}
-                >
-                  <option value="student">Student</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <div>
-                <label>Status</label>
-                <select
-                  value={editFormData.is_active !== undefined ? editFormData.is_active.toString() : 'true'}
-                  onChange={(e) => setEditFormData({ ...editFormData, is_active: e.target.value === 'true' })}
-                  style={{ width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #d1d5db' }}
-                >
-                  <option value="true">Active</option>
-                  <option value="false">Inactive</option>
-                </select>
-              </div>
-              <div>
-                <label>New Password (leave empty to keep current)</label>
-                <input
-                  type="password"
-                  value={editFormData.password || ''}
-                  onChange={(e) => setEditFormData({ ...editFormData, password: e.target.value })}
-                  minLength={6}
-                  style={{ width: '100%', padding: '8px', borderRadius: '5px', border: '1px solid #d1d5db' }}
-                />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-              <button
-                onClick={() => handleUpdateUser(selectedUser.id)}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer'
-                }}
-              >
-                Save Changes
-              </button>
-              <button
-                onClick={() => {
-                  setSelectedUser(null);
-                  setEditFormData({});
-                }}
-                style={{
-                  padding: '10px 20px',
-                  backgroundColor: '#6b7280',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px',
-                  cursor: 'pointer'
-                }}
-              >
+      <Modal
+        title="Edit User"
+        open={editModalVisible}
+        onCancel={() => {
+          setEditModalVisible(false);
+          setSelectedUser(null);
+          editForm.resetFields();
+        }}
+        footer={null}
+      >
+        <Form
+          form={editForm}
+          layout="vertical"
+          onFinish={handleUpdate}
+        >
+          <Form.Item
+            name="full_name"
+            label="Full Name"
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="student_id"
+            label="Student ID"
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item
+            name="role"
+            label="Role"
+          >
+            <Select>
+              <Option value="student">Student</Option>
+              <Option value="admin">Admin</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="is_active"
+            label="Status"
+            valuePropName="checked"
+          >
+            <Select>
+              <Option value={true}>Active</Option>
+              <Option value={false}>Inactive</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="password"
+            label="New Password (leave empty to keep current)"
+          >
+            <Input.Password />
+          </Form.Item>
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit">
+                Update
+              </Button>
+              <Button onClick={() => {
+                setEditModalVisible(false);
+                setSelectedUser(null);
+                editForm.resetFields();
+              }}>
                 Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

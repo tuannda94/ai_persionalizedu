@@ -3,6 +3,7 @@ Feedback API Endpoints - Local Backend
 Cho phép desktop app gửi feedback và check status
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import Optional
 import requests
@@ -14,13 +15,17 @@ from app.config import settings
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 
+class FeedbackRequest(BaseModel):
+    type: str
+    category: str
+    title: str
+    message: str
+    priority: int = 3
+
+
 @router.post("/send")
 async def send_feedback(
-    type: str,
-    category: str,
-    title: str,
-    message: str,
-    priority: int = 3,
+    feedback_req: FeedbackRequest,
     db: Session = Depends(get_db)
 ):
     """
@@ -32,21 +37,32 @@ async def send_feedback(
             detail="Feedback service is not enabled"
         )
 
-    feedback_service = get_feedback_service()
-    success = feedback_service.send_manual_feedback(
-        type=type,
-        category=category,
-        title=title,
-        message=message,
-        priority=priority
-    )
+    try:
+        feedback_service = get_feedback_service()
+        success = feedback_service.send_manual_feedback(
+            type=feedback_req.type,
+            category=feedback_req.category,
+            title=feedback_req.title,
+            message=feedback_req.message,
+            priority=feedback_req.priority
+        )
 
-    if success:
-        return {"ok": True, "message": "Feedback sent successfully"}
-    else:
+        if success:
+            return {"ok": True, "message": "Feedback sent successfully"}
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to send feedback to remote API. Please check logs for details."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error in send_feedback endpoint: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail="Failed to send feedback"
+            detail=f"Internal error while sending feedback: {str(e)}"
         )
 
 

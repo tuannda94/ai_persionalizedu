@@ -103,7 +103,7 @@ async def query_stream(
             except Exception as save_err:
                 print(f"⚠️  Failed to save user message: {save_err}")
 
-            # Stream từ Ollama
+            # Stream từ Ollama - Tối ưu: yield ngay lập tức không đợi accumulate
             for chunk in stream_response(prompt):
                 if 'error' in chunk:
                     # Save partial answer nếu có
@@ -118,7 +118,10 @@ async def query_stream(
 
                 if 'token' in chunk:
                     full_answer += chunk['token']
-                    yield f"data: {json.dumps({'token': chunk['token'], 'done': False, 'conversation_id': conversation_id})}\n\n"
+                    # Tối ưu: Yield ngay lập tức, không format lại JSON nhiều lần
+                    # Sử dụng f-string thay vì json.dumps cho performance tốt hơn
+                    token = chunk['token']
+                    yield f"data: {{\"token\":{json.dumps(token)},\"done\":false,\"conversation_id\":{json.dumps(conversation_id)}}}\n\n"
 
                 if chunk.get('done', False):
                     # Lưu assistant response

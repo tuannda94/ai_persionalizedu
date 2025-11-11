@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     # ============================================
 
     # Remote API Server (cho authentication, telemetry, updates)
-    REMOTE_API_URL: str = ""  # Ví dụ: "https://api.fpt.edu.vn"
+    REMOTE_API_URL: str = "http://localhost:8001"  # Default: local development
     REMOTE_API_TIMEOUT: int = 30
 
     # Telemetry (optional, gửi đến remote API)

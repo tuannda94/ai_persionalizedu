@@ -1,25 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { Table, Button, Modal, Form, Input, Select, Upload, Progress, Card, Space, Tag, message, Switch } from 'antd';
+import { UploadOutlined, CloudDownloadOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { versionsAPI } from '../services/api';
+import { handleApiError, shouldShowError } from '../utils/errorHandler';
+
+const { Option } = Select;
+const { TextArea } = Input;
 
 function Versions() {
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [uploadModalVisible, setUploadModalVisible] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [showUpload, setShowUpload] = useState(false);
-  const [platform, setPlatform] = useState('windows');
-  const [selectedFile, setSelectedFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-
-  // Form state
-  const [formData, setFormData] = useState({
-    version: '',
-    version_code: '',
-    platform: 'windows',
-    release_type: 'stable',
-    release_notes: '',
-    is_mandatory: false,
-    min_version_code: ''
-  });
+  const [form] = Form.useForm();
 
   useEffect(() => {
     loadVersions();
@@ -32,32 +26,21 @@ function Versions() {
       setVersions(response.data || []);
     } catch (error) {
       console.error('Failed to load versions:', error);
-      // Don't show alert if it's a 401 - interceptor will handle redirect
-      if (error.response?.status !== 401) {
-        alert('Failed to load versions: ' + (error.response?.data?.detail || error.message || 'Unknown error'));
+      if (shouldShowError(error)) {
+        const errorMsg = handleApiError(error, 'Failed to load versions');
+        if (errorMsg) {
+          message.error(errorMsg);
+        }
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-    }
-  };
-
-  const handleUpload = async (e) => {
-    e.preventDefault();
-
-    if (!selectedFile) {
-      alert('Please select a file');
-      return;
-    }
-
-    if (!formData.version || !formData.version_code) {
-      alert('Please fill in version and version code');
+  const handleUpload = async (values) => {
+    const file = values.file?.file || values.file;
+    if (!file) {
+      message.error('Please select a file');
       return;
     }
 
@@ -66,38 +49,34 @@ function Versions() {
 
     try {
       const uploadFormData = new FormData();
-      uploadFormData.append('file', selectedFile);
-      uploadFormData.append('version', formData.version);
-      uploadFormData.append('version_code', formData.version_code);
-      uploadFormData.append('platform', formData.platform);
-      uploadFormData.append('release_type', formData.release_type);
-      uploadFormData.append('release_notes', formData.release_notes || '');
-      uploadFormData.append('is_mandatory', formData.is_mandatory);
-      if (formData.min_version_code) {
-        uploadFormData.append('min_version_code', formData.min_version_code);
+      uploadFormData.append('file', file);
+      uploadFormData.append('version', values.version);
+      uploadFormData.append('version_code', values.version_code);
+      uploadFormData.append('platform', values.platform);
+      uploadFormData.append('release_type', values.release_type);
+      uploadFormData.append('release_notes', values.release_notes || '');
+      uploadFormData.append('is_mandatory', values.is_mandatory || false);
+      if (values.min_version_code) {
+        uploadFormData.append('min_version_code', values.min_version_code);
       }
 
-      const response = await versionsAPI.upload(uploadFormData, (progressEvent) => {
+      await versionsAPI.upload(uploadFormData, (progressEvent) => {
         const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
         setUploadProgress(percentCompleted);
       });
 
-      alert('Version uploaded successfully!');
-      setShowUpload(false);
-      setSelectedFile(null);
-      setFormData({
-        version: '',
-        version_code: '',
-        platform: 'windows',
-        release_type: 'stable',
-        release_notes: '',
-        is_mandatory: false,
-        min_version_code: ''
-      });
+      message.success('Version uploaded successfully!');
+      setUploadModalVisible(false);
+      form.resetFields();
       loadVersions();
     } catch (error) {
       console.error('Upload failed:', error);
-      alert(`Upload failed: ${error.response?.data?.detail || error.message}`);
+      if (shouldShowError(error)) {
+        const errorMsg = handleApiError(error, 'Upload failed');
+        if (errorMsg) {
+          message.error(errorMsg);
+        }
+      }
     } finally {
       setUploading(false);
       setUploadProgress(0);
@@ -109,10 +88,16 @@ function Versions() {
       await versionsAPI.update(versionId, {
         published_at: published ? new Date().toISOString() : null
       });
+      message.success(published ? 'Version published' : 'Version unpublished');
       loadVersions();
     } catch (error) {
       console.error('Failed to update version:', error);
-      alert('Failed to update version');
+      if (shouldShowError(error)) {
+        const errorMsg = handleApiError(error, 'Failed to update version');
+        if (errorMsg) {
+          message.error(errorMsg);
+        }
+      }
     }
   };
 
@@ -127,282 +112,238 @@ function Versions() {
     return new Date(dateString).toLocaleString();
   };
 
+  const columns = [
+    {
+      title: 'Version',
+      dataIndex: 'version',
+      key: 'version',
+      sorter: (a, b) => a.version.localeCompare(b.version),
+    },
+    {
+      title: 'Platform',
+      dataIndex: 'platform',
+      key: 'platform',
+      render: (platform) => <Tag color="blue">{platform?.toUpperCase()}</Tag>,
+    },
+    {
+      title: 'Type',
+      dataIndex: 'release_type',
+      key: 'release_type',
+      render: (type) => (
+        <Tag color={type === 'stable' ? 'green' : type === 'beta' ? 'orange' : 'red'}>
+          {type?.toUpperCase()}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Size',
+      dataIndex: 'file_size',
+      key: 'file_size',
+      render: (size) => formatFileSize(size),
+    },
+    {
+      title: 'Mandatory',
+      dataIndex: 'is_mandatory',
+      key: 'is_mandatory',
+      render: (mandatory) => mandatory ? <Tag color="red">Yes</Tag> : <Tag>No</Tag>,
+    },
+    {
+      title: 'Published',
+      dataIndex: 'published_at',
+      key: 'published_at',
+      render: (date) => formatDate(date),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          {record.published_at ? (
+            <Button
+              size="small"
+              onClick={() => handlePublish(record.id, false)}
+            >
+              Unpublish
+            </Button>
+          ) : (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => handlePublish(record.id, true)}
+            >
+              Publish
+            </Button>
+          )}
+          <Button
+            type="link"
+            icon={<CloudDownloadOutlined />}
+            href={record.download_url}
+            target="_blank"
+          >
+            Download
+          </Button>
+        </Space>
+      ),
+    },
+  ];
+
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1>Version Management</h1>
-        <button
-          onClick={() => setShowUpload(!showUpload)}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#007bff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
+    <div>
+      <Card>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h2 style={{ margin: 0 }}>Version Management</h2>
+          <Button
+            type="primary"
+            icon={<UploadOutlined />}
+            onClick={() => setUploadModalVisible(true)}
+          >
+            Upload New Version
+          </Button>
+        </div>
+
+        <Table
+          columns={columns}
+          dataSource={versions}
+          rowKey="id"
+          loading={loading}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total) => `Total ${total} versions`,
+          }}
+        />
+      </Card>
+
+      {/* Upload Modal */}
+      <Modal
+        title="Upload New Version"
+        open={uploadModalVisible}
+        onCancel={() => {
+          setUploadModalVisible(false);
+          form.resetFields();
+        }}
+        footer={null}
+        width={600}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleUpload}
+          initialValues={{
+            platform: 'windows',
+            release_type: 'stable',
+            is_mandatory: false
           }}
         >
-          {showUpload ? 'Cancel' : 'Upload New Version'}
-        </button>
-      </div>
-
-      {showUpload && (
-        <div style={{
-          border: '1px solid #ddd',
-          borderRadius: '8px',
-          padding: '20px',
-          marginBottom: '20px',
-          backgroundColor: '#f9f9f9'
-        }}>
-          <h2>Upload New Version</h2>
-          <form onSubmit={handleUpload}>
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Installer File *
-              </label>
-              <input
-                type="file"
-                onChange={handleFileSelect}
-                accept=".exe,.msi,.dmg,.deb,.AppImage"
-                required
-                style={{ width: '100%', padding: '8px' }}
-              />
-              {selectedFile && (
-                <p style={{ marginTop: '5px', color: '#666' }}>
-                  Selected: {selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(2)} MB)
-                </p>
-              )}
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                  Version * (e.g., 1.2.3)
-                </label>
-                <input
-                  type="text"
-                  value={formData.version}
-                  onChange={(e) => setFormData({ ...formData, version: e.target.value })}
-                  placeholder="1.2.3"
-                  required
-                  style={{ width: '100%', padding: '8px' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                  Version Code * (e.g., 10203)
-                </label>
-                <input
-                  type="number"
-                  value={formData.version_code}
-                  onChange={(e) => setFormData({ ...formData, version_code: e.target.value })}
-                  placeholder="10203"
-                  required
-                  style={{ width: '100%', padding: '8px' }}
-                />
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                  Platform *
-                </label>
-                <select
-                  value={formData.platform}
-                  onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
-                  required
-                  style={{ width: '100%', padding: '8px' }}
-                >
-                  <option value="windows">Windows</option>
-                  <option value="macos">macOS</option>
-                  <option value="linux">Linux</option>
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                  Release Type *
-                </label>
-                <select
-                  value={formData.release_type}
-                  onChange={(e) => setFormData({ ...formData, release_type: e.target.value })}
-                  required
-                  style={{ width: '100%', padding: '8px' }}
-                >
-                  <option value="stable">Stable</option>
-                  <option value="beta">Beta</option>
-                  <option value="alpha">Alpha</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Release Notes
-              </label>
-              <textarea
-                value={formData.release_notes}
-                onChange={(e) => setFormData({ ...formData, release_notes: e.target.value })}
-                placeholder="What's new in this version..."
-                rows="4"
-                style={{ width: '100%', padding: '8px' }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <input
-                  type="checkbox"
-                  checked={formData.is_mandatory}
-                  onChange={(e) => setFormData({ ...formData, is_mandatory: e.target.checked })}
-                />
-                <span style={{ fontWeight: 'bold' }}>Mandatory Update</span>
-              </label>
-            </div>
-
-            <div style={{ marginBottom: '15px' }}>
-              <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-                Minimum Version Code (optional)
-              </label>
-              <input
-                type="number"
-                value={formData.min_version_code}
-                onChange={(e) => setFormData({ ...formData, min_version_code: e.target.value })}
-                placeholder="10000"
-                style={{ width: '100%', padding: '8px' }}
-              />
-              <p style={{ marginTop: '5px', fontSize: '12px', color: '#666' }}>
-                Users with version code below this will be forced to update
-              </p>
-            </div>
-
-            {uploading && (
-              <div style={{ marginBottom: '15px' }}>
-                <div style={{
-                  width: '100%',
-                  backgroundColor: '#e0e0e0',
-                  borderRadius: '4px',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    width: `${uploadProgress}%`,
-                    backgroundColor: '#007bff',
-                    height: '20px',
-                    transition: 'width 0.3s'
-                  }}></div>
-                </div>
-                <p style={{ marginTop: '5px', textAlign: 'center' }}>
-                  Uploading... {uploadProgress}%
-                </p>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={uploading}
-              style={{
-                padding: '10px 20px',
-                backgroundColor: uploading ? '#ccc' : '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: uploading ? 'not-allowed' : 'pointer',
-                width: '100%'
-              }}
+          <Form.Item
+            name="file"
+            label="Installer File"
+            rules={[{ required: true, message: 'Please select a file!' }]}
+            valuePropName="file"
+            getValueFromEvent={(e) => {
+              if (Array.isArray(e)) {
+                return e[0];
+              }
+              return e?.fileList?.[0] || e?.file;
+            }}
+          >
+            <Upload
+              beforeUpload={() => false}
+              accept=".exe,.msi,.dmg,.deb,.AppImage"
+              maxCount={1}
             >
-              {uploading ? 'Uploading...' : 'Upload Version'}
-            </button>
-          </form>
-        </div>
-      )}
+              <Button icon={<UploadOutlined />}>Select File</Button>
+            </Upload>
+          </Form.Item>
 
-      <div>
-        <h2>Version List</h2>
-        {loading ? (
-          <p>Loading...</p>
-        ) : versions.length === 0 ? (
-          <p>No versions found</p>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
-            <thead>
-              <tr style={{ backgroundColor: '#f0f0f0' }}>
-                <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Version</th>
-                <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Platform</th>
-                <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Type</th>
-                <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Size</th>
-                <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Mandatory</th>
-                <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Published</th>
-                <th style={{ padding: '10px', textAlign: 'left', border: '1px solid #ddd' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {versions.map((version) => (
-                <tr key={version.id}>
-                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>{version.version}</td>
-                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>{version.platform}</td>
-                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>{version.release_type}</td>
-                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>{formatFileSize(version.file_size)}</td>
-                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                    {version.is_mandatory ? '✅' : '❌'}
-                  </td>
-                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                    {formatDate(version.published_at)}
-                  </td>
-                  <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                    {version.published_at ? (
-                      <button
-                        onClick={() => handlePublish(version.id, false)}
-                        style={{
-                          padding: '5px 10px',
-                          backgroundColor: '#ffc107',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Unpublish
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handlePublish(version.id, true)}
-                        style={{
-                          padding: '5px 10px',
-                          backgroundColor: '#28a745',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Publish
-                      </button>
-                    )}
-                    <a
-                      href={version.download_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        marginLeft: '10px',
-                        padding: '5px 10px',
-                        backgroundColor: '#007bff',
-                        color: 'white',
-                        textDecoration: 'none',
-                        borderRadius: '4px',
-                        display: 'inline-block'
-                      }}
-                    >
-                      Download
-                    </a>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+          <Form.Item
+            name="version"
+            label="Version (e.g., 1.2.3)"
+            rules={[{ required: true, message: 'Please input version!' }]}
+          >
+            <Input placeholder="1.2.3" />
+          </Form.Item>
+
+          <Form.Item
+            name="version_code"
+            label="Version Code (e.g., 10203)"
+            rules={[{ required: true, message: 'Please input version code!' }]}
+          >
+            <Input type="number" placeholder="10203" />
+          </Form.Item>
+
+          <Space style={{ width: '100%' }} size="large">
+            <Form.Item
+              name="platform"
+              label="Platform"
+              rules={[{ required: true }]}
+              style={{ flex: 1 }}
+            >
+              <Select>
+                <Option value="windows">Windows</Option>
+                <Option value="macos">macOS</Option>
+                <Option value="linux">Linux</Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item
+              name="release_type"
+              label="Release Type"
+              rules={[{ required: true }]}
+              style={{ flex: 1 }}
+            >
+              <Select>
+                <Option value="stable">Stable</Option>
+                <Option value="beta">Beta</Option>
+                <Option value="alpha">Alpha</Option>
+              </Select>
+            </Form.Item>
+          </Space>
+
+          <Form.Item
+            name="release_notes"
+            label="Release Notes"
+          >
+            <TextArea rows={4} placeholder="What's new in this version..." />
+          </Form.Item>
+
+          <Form.Item
+            name="is_mandatory"
+            label="Mandatory Update"
+            valuePropName="checked"
+          >
+            <Switch />
+          </Form.Item>
+
+          <Form.Item
+            name="min_version_code"
+            label="Minimum Version Code (optional)"
+            tooltip="Users with version code below this will be forced to update"
+          >
+            <Input type="number" placeholder="10000" />
+          </Form.Item>
+
+          {uploading && (
+            <Form.Item>
+              <Progress percent={uploadProgress} status="active" />
+            </Form.Item>
+          )}
+
+          <Form.Item>
+            <Space>
+              <Button type="primary" htmlType="submit" loading={uploading}>
+                Upload
+              </Button>
+              <Button onClick={() => {
+                setUploadModalVisible(false);
+                form.resetFields();
+              }}>
+                Cancel
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 }

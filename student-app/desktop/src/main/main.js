@@ -12,12 +12,19 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    show: false, // Ẩn cửa sổ cho đến khi content sẵn sàng
+    backgroundColor: '#f5f5f5', // Màu nền để tránh màn hình trắng
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
       nodeIntegration: false
     },
     icon: path.join(__dirname, '../../resources/icons/icon.png')
+  });
+
+  // Hiển thị cửa sổ khi content đã sẵn sàng
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
   });
 
   // Start backend trước khi load app

@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { Card, Statistic, Row, Col, Select, Spin, List, Tag } from 'antd';
+import { BarChartOutlined, MessageOutlined, ClockCircleOutlined, TrophyOutlined } from '@ant-design/icons';
 import { telemetryAPI, feedbackAPI } from '../services/api';
 import { handleApiError, shouldShowError } from '../utils/errorHandler';
+
+const { Option } = Select;
 
 function Analytics() {
   const [telemetryStats, setTelemetryStats] = useState(null);
@@ -16,17 +20,17 @@ function Analytics() {
     setLoading(true);
     try {
       const [telemetryRes, feedbackRes] = await Promise.all([
-        telemetryAPI.stats(days),
-        feedbackAPI.stats(days)
+        telemetryAPI.stats(days).catch(() => ({ data: null })),
+        feedbackAPI.stats(days).catch(() => ({ data: null }))
       ]);
       setTelemetryStats(telemetryRes.data);
       setFeedbackStats(feedbackRes.data);
     } catch (error) {
       console.error('Failed to load stats:', error);
       if (shouldShowError(error)) {
-        const message = handleApiError(error, 'Failed to load analytics');
-        if (message) {
-          alert(message);
+        const errorMsg = handleApiError(error, 'Failed to load analytics');
+        if (errorMsg) {
+          // Don't show error for analytics, just log
         }
       }
     } finally {
@@ -35,108 +39,123 @@ function Analytics() {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1>Analytics Dashboard</h1>
-        <select
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+        <h1 style={{ margin: 0 }}>Analytics Dashboard</h1>
+        <Select
           value={days}
-          onChange={(e) => setDays(Number(e.target.value))}
-          style={{ padding: '8px', borderRadius: '4px', border: '1px solid #d1d5db' }}
+          onChange={setDays}
+          style={{ width: 200 }}
         >
-          <option value={1}>Last 24 hours</option>
-          <option value={7}>Last 7 days</option>
-          <option value={30}>Last 30 days</option>
-          <option value={90}>Last 90 days</option>
-        </select>
+          <Option value={1}>Last 24 hours</Option>
+          <Option value={7}>Last 7 days</Option>
+          <Option value={30}>Last 30 days</Option>
+          <Option value={90}>Last 90 days</Option>
+        </Select>
       </div>
 
       {loading ? (
-        <div>Loading...</div>
+        <Spin size="large" style={{ display: 'block', textAlign: 'center', marginTop: 100 }} />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
+        <>
           {/* Telemetry Stats */}
           {telemetryStats && (
-            <div style={{ padding: '20px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-              <h2 style={{ marginTop: 0 }}>Usage Statistics</h2>
-              <div style={{ marginTop: '15px' }}>
-                <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#3b82f6' }}>
-                  {telemetryStats.total_queries || 0}
-                </div>
-                <div style={{ color: '#6b7280', marginTop: '5px' }}>Total Queries</div>
-              </div>
-              <div style={{ marginTop: '20px' }}>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>
-                  {Math.round(telemetryStats.average_duration_ms || 0)}ms
-                </div>
-                <div style={{ color: '#6b7280', marginTop: '5px' }}>Average Response Time</div>
-              </div>
-              <div style={{ marginTop: '20px' }}>
-                <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>Top Subjects</h3>
-                {telemetryStats.top_subjects?.map((item, idx) => (
-                  <div key={idx} style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    padding: '8px 0',
-                    borderBottom: idx < telemetryStats.top_subjects.length - 1 ? '1px solid #e5e7eb' : 'none'
-                  }}>
-                    <span>{item.subject || 'Unknown'}</span>
-                    <span style={{ fontWeight: 'bold' }}>{item.count}</span>
-                  </div>
-                )) || <div style={{ color: '#6b7280' }}>No data</div>}
-              </div>
-            </div>
+            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+              <Col xs={24} sm={12} lg={6}>
+                <Card>
+                  <Statistic
+                    title="Total Queries"
+                    value={telemetryStats.total_queries || 0}
+                    prefix={<BarChartOutlined />}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card>
+                  <Statistic
+                    title="Avg Response Time"
+                    value={Math.round(telemetryStats.average_duration_ms || 0)}
+                    suffix="ms"
+                    prefix={<ClockCircleOutlined />}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card>
+                  <Statistic
+                    title="Total Feedback"
+                    value={feedbackStats?.total || 0}
+                    prefix={<MessageOutlined />}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} lg={6}>
+                <Card>
+                  <Statistic
+                    title="Pending Feedback"
+                    value={feedbackStats?.pending || 0}
+                    prefix={<MessageOutlined />}
+                  />
+                </Card>
+              </Col>
+            </Row>
           )}
 
-          {/* Feedback Stats */}
-          {feedbackStats && (
-            <div style={{ padding: '20px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-              <h2 style={{ marginTop: 0 }}>Feedback Statistics</h2>
-              <div style={{ marginTop: '15px' }}>
-                <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#f59e0b' }}>
-                  {feedbackStats.total || 0}
-                </div>
-                <div style={{ color: '#6b7280', marginTop: '5px' }}>Total Feedback</div>
-              </div>
-              <div style={{ marginTop: '20px' }}>
-                <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>By Status</h3>
-                {Object.entries(feedbackStats.by_status || {}).map(([status, count]) => (
-                  <div key={status} style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    padding: '8px 0'
-                  }}>
-                    <span style={{ textTransform: 'capitalize' }}>{status}</span>
-                    <span style={{ fontWeight: 'bold' }}>{count}</span>
-                  </div>
-                ))}
-              </div>
-              <div style={{ marginTop: '20px' }}>
-                <h3 style={{ fontSize: '16px', marginBottom: '10px' }}>By Type</h3>
-                {Object.entries(feedbackStats.by_type || {}).map(([type, count]) => (
-                  <div key={type} style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    padding: '8px 0'
-                  }}>
-                    <span style={{ textTransform: 'capitalize' }}>{type}</span>
-                    <span style={{ fontWeight: 'bold' }}>{count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <Row gutter={[16, 16]}>
+            {/* Top Subjects */}
+            {telemetryStats?.top_subjects && telemetryStats.top_subjects.length > 0 && (
+              <Col xs={24} lg={12}>
+                <Card title="Top Subjects" extra={<TrophyOutlined />}>
+                  <List
+                    dataSource={telemetryStats.top_subjects}
+                    renderItem={(item, idx) => (
+                      <List.Item>
+                        <List.Item.Meta
+                          title={
+                            <Space>
+                              <Tag color="blue">{idx + 1}</Tag>
+                              {item.subject || 'Unknown'}
+                            </Space>
+                          }
+                          description={`${item.count} queries`}
+                        />
+                      </List.Item>
+                    )}
+                  />
+                </Card>
+              </Col>
+            )}
 
-          {/* Performance Metrics */}
-          <div style={{ padding: '20px', background: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <h2 style={{ marginTop: 0 }}>Performance Metrics</h2>
-            <div style={{ marginTop: '15px', color: '#6b7280' }}>
-              <p>Response time distribution and RAG accuracy metrics will be displayed here.</p>
-              <p style={{ fontSize: '14px', marginTop: '10px' }}>
-                Average query time: {telemetryStats?.average_duration_ms ? `${Math.round(telemetryStats.average_duration_ms)}ms` : 'N/A'}
-              </p>
-            </div>
-          </div>
-        </div>
+            {/* Feedback Stats */}
+            {feedbackStats && (
+              <Col xs={24} lg={12}>
+                <Card title="Feedback Statistics">
+                  <Row gutter={16}>
+                    {Object.entries(feedbackStats.by_status || {}).map(([status, count]) => (
+                      <Col span={12} key={status}>
+                        <Statistic
+                          title={status.toUpperCase()}
+                          value={count}
+                        />
+                      </Col>
+                    ))}
+                  </Row>
+                  {Object.keys(feedbackStats.by_type || {}).length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      <h4>By Type</h4>
+                      {Object.entries(feedbackStats.by_type || {}).map(([type, count]) => (
+                        <div key={type} style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+                          <span>{type}</span>
+                          <Tag>{count}</Tag>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card>
+              </Col>
+            )}
+          </Row>
+        </>
       )}
     </div>
   );

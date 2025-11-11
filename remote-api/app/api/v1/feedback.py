@@ -2,7 +2,7 @@
 Feedback API Endpoints - Remote API
 Thu thập và quản lý feedback từ student apps
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_, and_
 from typing import Optional, List
@@ -17,7 +17,7 @@ from app.schemas.feedback import (
     FeedbackResponse,
     FeedbackListResponse
 )
-from app.core.security import get_current_user, get_current_admin_user
+from app.core.security import get_current_user, get_current_admin_user, get_optional_user
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
 
@@ -25,13 +25,16 @@ router = APIRouter(prefix="/feedback", tags=["feedback"])
 @router.post("", response_model=FeedbackResponse, status_code=status.HTTP_201_CREATED)
 async def create_feedback(
     feedback_data: FeedbackCreate,
-    db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_current_user)  # Optional auth
+    request: Request,
+    db: Session = Depends(get_db)
 ):
     """
     Tạo feedback mới (tự động hoặc manual)
     Không cần authentication (public endpoint)
     """
+    # Get optional user from request
+    current_user = await get_optional_user(request, db)
+
     # Validate feedback type
     try:
         feedback_type = FeedbackType(feedback_data.type)

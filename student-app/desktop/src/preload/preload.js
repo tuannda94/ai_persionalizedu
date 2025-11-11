@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return process.env.BACKEND_URL || 'http://localhost:8000';
   },
 
+  // Remote API URL
+  getRemoteApiUrl: () => {
+    // Remote API URL cho authentication, telemetry, updates
+    return process.env.REMOTE_API_URL || 'http://localhost:8001';
+  },
+
   // Platform info
   getPlatform: () => process.platform,
 

@@ -4,6 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { Button } from 'antd';
+import { ReloadOutlined, DownloadOutlined, CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons';
 
 /**
  * Update Button Component
@@ -94,37 +96,52 @@ export const UpdateButton = ({ backendUrl }) => {
     }, React.createElement('span', null, '🔴'), React.createElement('span', null, 'Offline'));
   }
 
-  const buttonText = {
-    'checking': '⏳ Đang kiểm tra...',
-    'available': '⬇️ Cập nhật có sẵn',
-    'downloading': '⬇️ Đang tải...',
-    'downloaded': '✅ Cài đặt ngay',
-    'idle': '🔄 Kiểm tra cập nhật'
-  }[updateStatus] || '🔄 Kiểm tra cập nhật';
+  const getButtonProps = () => {
+    switch (updateStatus) {
+      case 'checking':
+        return {
+          icon: React.createElement(LoadingOutlined),
+          children: 'Đang kiểm tra...',
+          type: 'default',
+          loading: true
+        };
+      case 'available':
+        return {
+          icon: React.createElement(DownloadOutlined),
+          children: 'Cập nhật có sẵn',
+          type: 'primary',
+          style: { background: '#10b981', borderColor: '#10b981' }
+        };
+      case 'downloading':
+        return {
+          icon: React.createElement(DownloadOutlined),
+          children: 'Đang tải...',
+          type: 'primary',
+          loading: true,
+          style: { background: '#3b82f6', borderColor: '#3b82f6' }
+        };
+      case 'downloaded':
+        return {
+          icon: React.createElement(CheckCircleOutlined),
+          children: 'Cài đặt ngay',
+          type: 'primary',
+          style: { background: '#10b981', borderColor: '#10b981' }
+        };
+      default:
+        return {
+          icon: React.createElement(ReloadOutlined),
+          children: 'Kiểm tra cập nhật',
+          type: 'default'
+        };
+    }
+  };
 
-  const buttonColor = {
-    'available': '#10b981',
-    'downloading': '#3b82f6',
-    'downloaded': '#10b981',
-    'idle': '#6b7280'
-  }[updateStatus] || '#6b7280';
-
-  return React.createElement('div', { style: { position: 'relative' } },
-    React.createElement('button', {
+  return React.createElement('div', { style: { position: 'relative', display: 'inline-block' } },
+    React.createElement(Button, {
+      ...getButtonProps(),
       onClick: handleCheckUpdate,
-      disabled: updateStatus === 'checking' || updateStatus === 'downloading',
-      style: {
-        padding: '8px 16px',
-        background: buttonColor,
-        color: 'white',
-        border: 'none',
-        borderRadius: '4px',
-        cursor: (updateStatus === 'checking' || updateStatus === 'downloading') ? 'not-allowed' : 'pointer',
-        fontSize: '14px',
-        fontWeight: '500',
-        opacity: (updateStatus === 'checking' || updateStatus === 'downloading') ? 0.7 : 1
-      }
-    }, buttonText),
+      disabled: updateStatus === 'checking' || updateStatus === 'downloading'
+    }),
 
     showProgress && (updateStatus === 'downloading' || updateStatus === 'available') && React.createElement('div', {
       style: {

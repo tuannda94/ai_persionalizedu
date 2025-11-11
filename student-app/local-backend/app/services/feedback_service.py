@@ -125,9 +125,23 @@ class FeedbackService:
                 timeout=self.timeout
             )
 
-            return response.status_code == 201
+            if response.status_code == 201:
+                return True
+            else:
+                # Log error response for debugging
+                try:
+                    error_detail = response.json()
+                    print(f"⚠️  Feedback send failed: HTTP {response.status_code} - {error_detail}")
+                except:
+                    print(f"⚠️  Feedback send failed: HTTP {response.status_code} - {response.text[:200]}")
+                return False
+        except requests.exceptions.RequestException as e:
+            print(f"⚠️  Feedback send failed (network error): {e}")
+            return False
         except Exception as e:
-            print(f"⚠️  Feedback send failed: {e}")
+            print(f"⚠️  Feedback send failed (unexpected error): {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def send_error_feedback(

@@ -4,6 +4,9 @@
 const { autoUpdater } = require('electron-updater');
 const { ipcMain, dialog } = require('electron');
 const log = require('electron-log');
+const https = require('https');
+const http = require('http');
+const { URL } = require('url');
 
 // Configure auto-updater
 autoUpdater.logger = log;
@@ -123,6 +126,44 @@ function getVersionCode(version) {
 }
 
 /**
+ * Make HTTP request (Node.js compatible)
+ */
+function makeRequest(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const isHttps = urlObj.protocol === 'https:';
+    const httpModule = isHttps ? https : http;
+
+    const requestOptions = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || (isHttps ? 443 : 80),
+      path: urlObj.pathname + urlObj.search,
+      method: options.method || 'GET',
+      headers: options.headers || {}
+    };
+
+    const req = httpModule.request(requestOptions, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const jsonData = JSON.parse(data);
+          resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, json: () => Promise.resolve(jsonData) });
+        } catch (e) {
+          resolve({ ok: false, status: res.statusCode, json: () => Promise.resolve({}) });
+        }
+      });
+    });
+
+    req.on('error', reject);
+    if (options.body) {
+      req.write(options.body);
+    }
+    req.end();
+  });
+}
+
+/**
  * Check for updates manually
  */
 async function checkForUpdates() {
@@ -140,15 +181,17 @@ async function checkForUpdates() {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${UPDATE_SERVER_URL}/api/v1/updates/check`, {
+    const requestBody = JSON.stringify({
+      platform: process.platform === 'win32' ? 'windows' :
+                  process.platform === 'darwin' ? 'macos' : 'linux',
+      current_version: currentVersion,
+      current_version_code: getVersionCode(currentVersion)
+    });
+
+    const response = await makeRequest(`${UPDATE_SERVER_URL}/api/v1/updates/check`, {
       method: 'POST',
       headers: headers,
-      body: JSON.stringify({
-        platform: process.platform === 'win32' ? 'windows' :
-                  process.platform === 'darwin' ? 'macos' : 'linux',
-        current_version: currentVersion,
-        current_version_code: getVersionCode(currentVersion)
-      })
+      body: requestBody
     });
 
     if (response.ok) {
@@ -223,20 +266,27 @@ function getAuthToken() {
  */
 async function logUpdateProgress(status, fromVersion, toVersion, error = null) {
   try {
-    await fetch(`${UPDATE_SERVER_URL}/api/v1/updates/log`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${getAuthToken()}`
-      },
-      body: JSON.stringify({
-        from_version: fromVersion,
-        to_version: toVersion,
-        platform: process.platform === 'win32' ? 'windows' :
+    const token = getAuthToken();
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const requestBody = JSON.stringify({
+      from_version: fromVersion,
+      to_version: toVersion,
+      platform: process.platform === 'win32' ? 'windows' :
                   process.platform === 'darwin' ? 'macos' : 'linux',
-        status: status,
-        error_message: error
-      })
+      status: status,
+      error_message: error
+    });
+
+    await makeRequest(`${UPDATE_SERVER_URL}/api/v1/updates/log`, {
+      method: 'POST',
+      headers: headers,
+      body: requestBody
     });
   } catch (error) {
     log.error('Error logging update progress:', error);

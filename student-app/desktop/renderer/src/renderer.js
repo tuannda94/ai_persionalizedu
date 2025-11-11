@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Layout, Input, Button, List, Card, Space, Tag, Badge, Empty, Spin, message, Modal } from 'antd';
+import { SendOutlined, PlusOutlined, DeleteOutlined, MenuFoldOutlined, MenuUnfoldOutlined, RobotOutlined, UserOutlined, LoginOutlined, LogoutOutlined, MessageOutlined } from '@ant-design/icons';
 import { UpdateButton, OfflineIndicator } from './components';
+import LoginModal from './components/LoginModal';
+import FeedbackModal from './components/FeedbackModal';
+// Import Ant Design CSS - Must be imported before any other styles
+import 'antd/dist/reset.css';
 
 const DEFAULT_BACKEND_URL = 'http://localhost:8000';
 
@@ -50,6 +56,9 @@ const App = () => {
   const [conversationId, setConversationId] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [user, setUser] = useState(null);
+  const [loginModalVisible, setLoginModalVisible] = useState(false);
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [userId] = useState(() => {
     // Lấy user_id từ localStorage hoặc tạo mới
     let uid = localStorage.getItem('user_id');
@@ -63,6 +72,18 @@ const App = () => {
   const inputRef = useRef(null);
   const activeStreamsRef = useRef(new Map()); // Track active streams by conversation_id
   const conversationMessagesRef = useRef(new Map()); // Cache messages by conversation_id
+
+  // Load user from localStorage on mount
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        setUser(JSON.parse(userStr));
+      } catch (e) {
+        console.error('Failed to parse user from localStorage', e);
+      }
+    }
+  }, []);
 
   // Get backend URL
   useEffect(() => {
@@ -353,6 +374,14 @@ const App = () => {
     setMessages(newMessages);
     const assistantMessageIndex = newMessages.length - 1;
 
+    // QUAN TRỌNG: Lưu newMessages vào cache NGAY LẬP TỨC để đảm bảo user message không bị mất
+    conversationMessagesRef.current.set(currentConvId, newMessages);
+    try {
+      localStorage.setItem(`messages_${currentConvId}`, JSON.stringify(newMessages));
+    } catch (e) {
+      console.warn('Failed to backup messages to localStorage:', e);
+    }
+
     // Reload conversations list ngay để hiển thị conversation mới trong sidebar
     // (nếu đây là message đầu tiên trong conversation mới)
     if (messages.length === 0) {
@@ -439,12 +468,22 @@ const App = () => {
               if (data.token) {
                 fullAnswer += data.token;
                 // Update messages của conversation này (có thể đang xem hoặc không)
+                // QUAN TRỌNG: Luôn lấy từ cache để đảm bảo có user message
                 const currentConvMessages = conversationMessagesRef.current.get(currentConvId) || newMessages;
                 const updated = [...currentConvMessages];
-                updated[assistantMessageIndex] = {
-                  role: 'assistant',
-                  content: fullAnswer
-                };
+                // Đảm bảo assistant message index vẫn đúng
+                if (updated[assistantMessageIndex]) {
+                  updated[assistantMessageIndex] = {
+                    role: 'assistant',
+                    content: fullAnswer
+                  };
+                } else {
+                  // Nếu không có, thêm vào cuối (fallback)
+                  updated.push({
+                    role: 'assistant',
+                    content: fullAnswer
+                  });
+                }
                 updateConversationMessages(currentConvId, updated);
               }
 
@@ -520,185 +559,238 @@ const App = () => {
     }
   };
 
+  const { Sider, Content, Header } = Layout;
+  const { TextArea } = Input;
+  const isCurrentConversationLoading = loadingConversations.get(conversationId) || false;
+
   return (
     <OfflineIndicator onOnlineChange={(online) => {
       if (!online && backendStatus === 'online') {
         // Disable internet-dependent features when offline
       }
     }}>
-    <div style={styles.container}>
-      {/* Sidebar */}
-      {sidebarOpen && (
-        <div style={styles.sidebar}>
-          <div style={styles.sidebarHeader}>
-            <h3 style={styles.sidebarTitle}>Lịch sử hội thoại</h3>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              style={styles.sidebarCloseBtn}
-              title="Đóng sidebar"
-            >
-              ✕
-            </button>
-          </div>
-          <button
-            onClick={createNewConversation}
-            style={styles.newConvButton}
+      <Layout style={{ height: '100vh' }}>
+        {/* Sidebar */}
+        {sidebarOpen && (
+          <Sider
+            width={300}
+            style={{
+              background: '#fff',
+              borderRight: '1px solid #e0e0e0'
+            }}
           >
-            ➕ Cuộc hội thoại mới
-          </button>
-          <div style={styles.conversationsList}>
-            {conversations.length === 0 ? (
-              <div style={styles.emptyState}>Chưa có cuộc hội thoại nào</div>
-            ) : (
-              conversations.map((conv) => (
-                <div
-                  key={conv.conversation_id}
-                  onClick={() => switchConversation(conv.conversation_id)}
-                  data-conversation-item
-                  style={{
-                    ...styles.conversationItem,
-                    ...(conv.conversation_id === conversationId ? styles.conversationItemActive : {})
-                  }}
-                >
-                  <div style={styles.conversationContent}>
-                    <div style={styles.conversationPreview}>
-                      {conv.last_message || 'Cuộc hội thoại trống'}
-                    </div>
-                    <div style={styles.conversationMeta}>
-                      {conv.message_count} tin nhắn
-                      {loadingConversations.get(conv.conversation_id) && (
-                        <span style={{ marginLeft: '8px', color: '#007bff' }}>⏳ Đang trả lời...</span>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => deleteConversation(conv.conversation_id, e)}
-                    data-delete-btn
-                    style={styles.deleteButton}
-                    title="Xóa cuộc hội thoại"
-                  >
-                    🗑️
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Main Content */}
-      <div style={styles.mainContent}>
-        {/* Header */}
-        <div style={styles.header}>
-          {!sidebarOpen && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              style={styles.sidebarToggleBtn}
-              title="Mở sidebar"
-            >
-              ☰
-            </button>
-          )}
-        <div>
-          <h1 style={styles.title}>🤖 FPT Polytechnic AI Tutor</h1>
-          {conversationId && (
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-              Conversation: {conversationId}
+            <div style={{ padding: 16, borderBottom: '1px solid #e0e0e0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>Lịch sử hội thoại</h3>
+              <Button
+                type="text"
+                icon={<MenuFoldOutlined />}
+                onClick={() => setSidebarOpen(false)}
+              />
             </div>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <UpdateButton backendUrl={backendUrl} />
-          <button
-            onClick={createNewConversation}
-            style={{
-              padding: '6px 12px',
-              fontSize: '12px',
-              backgroundColor: '#6c757d',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer'
-            }}
-            title="Tạo cuộc hội thoại mới"
-          >
-            ➕ Mới
-          </button>
-          <div style={styles.status}>
-            <div style={{
-              ...styles.statusDot,
-              backgroundColor: backendStatus === 'online' ? '#4caf50' : '#f44336'
-            }}></div>
-            <span>{backendStatus === 'online' ? 'Online' : 'Offline'}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div style={styles.messagesContainer}>
-        {messages.length === 0 && (
-          <div style={styles.welcomeMessage}>
-            <h2>Xin chào! 👋</h2>
-            <p>Hãy hỏi tôi bất kỳ điều gì về môn học. Ví dụ:</p>
-            <ul style={styles.exampleList}>
-              <li>"Giải thích về variables trong programming"</li>
-              <li>"Array là gì?"</li>
-              <li>"Stack hoạt động như thế nào?"</li>
-            </ul>
-          </div>
-        )}
-
-        {messages.filter(msg => msg && msg.role).map((msg, idx) => (
-          <div
-            key={idx}
-            style={{
-              ...styles.message,
-              ...(msg.role === 'user' ? styles.userMessage : styles.assistantMessage)
-            }}
-          >
-            <div style={{
-              ...styles.messageContent,
-              ...(msg.role === 'user' ? styles.userMessageContent : styles.assistantMessageContent)
-            }}>
-              {msg.role === 'assistant' ? (
-                <div
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
-                  className="markdown-content"
-                />
+            <div style={{ padding: '0 12px', marginBottom: 8 }}>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                block
+                onClick={createNewConversation}
+              >
+                Cuộc hội thoại mới
+              </Button>
+            </div>
+            <div style={{ overflowY: 'auto', height: 'calc(100vh - 120px)' }}>
+              {conversations.length === 0 ? (
+                <Empty description="Chưa có cuộc hội thoại nào" style={{ marginTop: 40 }} />
               ) : (
-                <div>{msg.content}</div>
+                <List
+                  dataSource={conversations}
+                  renderItem={(conv) => (
+                    <List.Item
+                      style={{
+                        cursor: 'pointer',
+                        backgroundColor: conv.conversation_id === conversationId ? '#e6f7ff' : '#fff',
+                        borderLeft: conv.conversation_id === conversationId ? '3px solid #1890ff' : 'none',
+                        padding: '12px 16px'
+                      }}
+                      onClick={() => switchConversation(conv.conversation_id)}
+                      actions={[
+                        <Button
+                          key="delete"
+                          type="text"
+                          danger
+                          icon={<DeleteOutlined />}
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteConversation(conv.conversation_id, e);
+                          }}
+                        />
+                      ]}
+                    >
+                      <List.Item.Meta
+                        title={
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {conv.last_message || 'Cuộc hội thoại trống'}
+                          </div>
+                        }
+                        description={
+                          <Space>
+                            <span>{conv.message_count} tin nhắn</span>
+                            {loadingConversations.get(conv.conversation_id) && (
+                              <Badge status="processing" text="Đang trả lời..." />
+                            )}
+                          </Space>
+                        }
+                      />
+                    </List.Item>
+                  )}
+                />
               )}
             </div>
-          </div>
-        ))}
+          </Sider>
+        )}
 
-        {(() => {
-          const isCurrentConversationLoading = loadingConversations.get(conversationId) || false;
-          return isCurrentConversationLoading && (
-            <div style={{ ...styles.message, ...styles.assistantMessage }}>
-              <div style={{
-                ...styles.messageContent,
-                ...styles.assistantMessageContent,
-                ...styles.loading
-              }}>
-                <div style={{...styles.loadingDot}} className="loading-dot-1"></div>
-                <div style={{...styles.loadingDot}} className="loading-dot-2"></div>
-                <div style={{...styles.loadingDot}} className="loading-dot-3"></div>
+        <Layout>
+          {/* Header */}
+          <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', height: 64, lineHeight: '64px' }}>
+            <Space>
+              {!sidebarOpen && (
+                <Button
+                  type="text"
+                  icon={<MenuUnfoldOutlined />}
+                  onClick={() => setSidebarOpen(true)}
+                />
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: '1.5' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <RobotOutlined />
+                  <span style={{ fontSize: 18, fontWeight: 600 }}>FPT Polytechnic AI Tutor</span>
+                </div>
+                {conversationId && (
+                  <Tag style={{ marginTop: 4, fontSize: 11 }}>ID: {conversationId.substring(0, 12)}...</Tag>
+                )}
               </div>
-            </div>
-          );
-        })()}
+            </Space>
+            <Space>
+              <UpdateButton backendUrl={backendUrl} />
+              <Button
+                icon={<PlusOutlined />}
+                onClick={createNewConversation}
+              >
+                Mới
+              </Button>
+              <Button
+                icon={<MessageOutlined />}
+                onClick={() => setFeedbackModalVisible(true)}
+              >
+                Feedback
+              </Button>
+              {user ? (
+                <Space>
+                  <Tag color="green">{user.full_name || user.email}</Tag>
+                  <Button
+                    type="text"
+                    icon={<LogoutOutlined />}
+                    onClick={() => {
+                      localStorage.removeItem('access_token');
+                      localStorage.removeItem('refresh_token');
+                      localStorage.removeItem('user');
+                      setUser(null);
+                      message.success('Đã đăng xuất');
+                    }}
+                  >
+                    Đăng xuất
+                  </Button>
+                </Space>
+              ) : (
+                <Button
+                  icon={<LoginOutlined />}
+                  onClick={() => setLoginModalVisible(true)}
+                >
+                  Đăng nhập
+                </Button>
+              )}
+              <Tag color="blue" style={{ fontSize: 12 }}>
+                v{window.electronAPI?.getVersion?.() || '1.0.0'}
+              </Tag>
+              <Badge
+                status={backendStatus === 'online' ? 'success' : 'error'}
+                text={backendStatus === 'online' ? 'Online' : 'Offline'}
+              />
+            </Space>
+          </Header>
 
-        <div ref={messagesEndRef} />
-      </div>
+          {/* Messages */}
+          <Content style={{ overflowY: 'auto', padding: 24, background: '#f5f5f5' }}>
+            {messages.length === 0 ? (
+              <Empty
+                description={
+                  <div>
+                    <h2>Xin chào! 👋</h2>
+                    <p>Hãy hỏi tôi bất kỳ điều gì về môn học. Ví dụ:</p>
+                    <ul style={{ textAlign: 'left', display: 'inline-block' }}>
+                      <li>"Giải thích về variables trong programming"</li>
+                      <li>"Array là gì?"</li>
+                      <li>"Stack hoạt động như thế nào?"</li>
+                    </ul>
+                  </div>
+                }
+                style={{ marginTop: 100 }}
+              />
+            ) : (
+              <div style={{ maxWidth: 800, margin: '0 auto' }}>
+                {messages.filter(msg => msg && msg.role).map((msg, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      marginBottom: 16,
+                      justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start'
+                    }}
+                  >
+                    <Card
+                      style={{
+                        maxWidth: '70%',
+                        backgroundColor: msg.role === 'user' ? '#1890ff' : '#fff',
+                        border: msg.role === 'user' ? 'none' : '1px solid #e0e0e0'
+                      }}
+                      bodyStyle={{
+                        padding: '12px 16px',
+                        color: msg.role === 'user' ? '#fff' : '#333'
+                      }}
+                    >
+                      <Space>
+                        {msg.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
+                        {msg.role === 'assistant' ? (
+                          <div
+                            dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                            className="markdown-content"
+                            style={{ color: '#333' }}
+                          />
+                        ) : (
+                          <div style={{ color: '#fff' }}>{msg.content}</div>
+                        )}
+                      </Space>
+                    </Card>
+                  </div>
+                ))}
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} style={styles.inputContainer}>
-        {(() => {
-          const isCurrentConversationLoading = loadingConversations.get(conversationId) || false;
-          return (
-            <>
-              <textarea
+                {isCurrentConversationLoading && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 16 }}>
+                    <Card style={{ maxWidth: '70%' }}>
+                      <Spin size="small" /> <span style={{ marginLeft: 8 }}>Đang suy nghĩ...</span>
+                    </Card>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+            )}
+          </Content>
+
+          {/* Input */}
+          <div style={{ padding: '16px 24px', background: '#fff', borderTop: '1px solid #e0e0e0' }}>
+            <Space.Compact style={{ width: '100%' }}>
+              <TextArea
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -710,32 +802,46 @@ const App = () => {
                 }}
                 placeholder="Nhập câu hỏi của bạn... (Enter để gửi, Shift+Enter để xuống dòng)"
                 disabled={isCurrentConversationLoading || backendStatus !== 'online'}
-                style={styles.input}
-                rows={1}
+                autoSize={{ minRows: 1, maxRows: 4 }}
+                style={{ flex: 1 }}
               />
-              <button
-                type="submit"
-                disabled={isCurrentConversationLoading || !input.trim() || backendStatus !== 'online'}
-                style={{
-                  ...styles.sendButton,
-                  opacity: (isCurrentConversationLoading || !input.trim() || backendStatus !== 'online') ? 0.5 : 1,
-                  cursor: (isCurrentConversationLoading || !input.trim() || backendStatus !== 'online') ? 'not-allowed' : 'pointer'
-                }}
+              <Button
+                type="primary"
+                icon={<SendOutlined />}
+                loading={isCurrentConversationLoading}
+                disabled={!input.trim() || backendStatus !== 'online'}
+                onClick={handleSubmit}
+                style={{ height: 'auto' }}
               >
-                {isCurrentConversationLoading ? '⏳' : '📤'}
-              </button>
-            </>
-          );
-        })()}
-      </form>
+                Gửi
+              </Button>
+            </Space.Compact>
+          </div>
 
-      {backendStatus === 'offline' && (
-        <div style={styles.errorBanner}>
-          ⚠️ Backend không kết nối được. Vui lòng kiểm tra backend đang chạy.
-        </div>
-      )}
-      </div>
-    </div>
+          {backendStatus === 'offline' && (
+            <div style={{ padding: '12px 24px', background: '#fff3cd', color: '#856404', textAlign: 'center' }}>
+              ⚠️ Backend không kết nối được. Vui lòng kiểm tra backend đang chạy.
+            </div>
+          )}
+        </Layout>
+      </Layout>
+
+      {/* Login Modal */}
+      <LoginModal
+        visible={loginModalVisible}
+        onCancel={() => setLoginModalVisible(false)}
+        onSuccess={(userData) => {
+          setUser(userData);
+          setLoginModalVisible(false);
+        }}
+      />
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        visible={feedbackModalVisible}
+        onCancel={() => setFeedbackModalVisible(false)}
+        onSuccess={() => setFeedbackModalVisible(false)}
+      />
     </OfflineIndicator>
   );
 };

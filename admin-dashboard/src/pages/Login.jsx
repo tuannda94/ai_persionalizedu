@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Form, Input, Button, Card, Alert, Typography } from 'antd';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { authAPI } from '../services/api';
 
+const { Title, Text } = Typography;
+
 function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [form] = Form.useForm();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (values) => {
     setError('');
     setLoading(true);
 
     try {
-      const response = await authAPI.login(email, password);
+      const response = await authAPI.login(values.email, values.password);
       const { access_token, refresh_token, user } = response.data;
 
       // Store tokens
@@ -46,114 +48,88 @@ function Login() {
       justifyContent: 'center',
       alignItems: 'center',
       height: '100vh',
-      backgroundColor: '#f3f4f6'
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
     }}>
-      <div style={{
-        backgroundColor: 'white',
-        padding: '40px',
-        borderRadius: '10px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        width: '400px'
-      }}>
-        <h1 style={{ marginBottom: '30px', textAlign: 'center', color: '#2c3e50' }}>
-          Admin Dashboard
-        </h1>
-        <h2 style={{ marginBottom: '20px', textAlign: 'center', color: '#7f8c8d', fontSize: '18px' }}>
-          Login
-        </h2>
+      <Card style={{ width: 400, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <Title level={2} style={{ marginBottom: 8 }}>Admin Dashboard</Title>
+          <Text type="secondary">Please login to continue</Text>
+        </div>
 
         {error && (
-          <div style={{
-            padding: '12px',
-            backgroundColor: '#fee',
-            color: '#c33',
-            borderRadius: '5px',
-            marginBottom: '20px',
-            border: '1px solid #fcc'
-          }}>
-            {error}
-          </div>
+          <Alert
+            message={error}
+            type="error"
+            showIcon
+            closable
+            onClose={() => setError('')}
+            style={{ marginBottom: 24 }}
+          />
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: '#2c3e50', fontWeight: '500' }}>
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="admin@fpt.edu.vn"
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '5px',
-                border: '1px solid #d1d5db',
-                fontSize: '16px',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '30px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', color: '#2c3e50', fontWeight: '500' }}>
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="Enter your password"
-              style={{
-                width: '100%',
-                padding: '12px',
-                borderRadius: '5px',
-                border: '1px solid #d1d5db',
-                fontSize: '16px',
-                boxSizing: 'border-box'
-              }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              width: '100%',
-              padding: '12px',
-              backgroundColor: loading ? '#9ca3af' : '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.6 : 1
-            }}
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          initialValues={{
+            email: 'admin@fpt.edu.vn'
+          }}
+        >
+          <Form.Item
+            name="email"
+            label="Email"
+            rules={[
+              { required: true, message: 'Please input your email!' },
+              { type: 'email', message: 'Please input valid email!' }
+            ]}
           >
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
+            <Input
+              prefix={<UserOutlined />}
+              placeholder="admin@fpt.edu.vn"
+              size="large"
+            />
+          </Form.Item>
 
-        <div style={{
-          marginTop: '20px',
-          padding: '15px',
-          backgroundColor: '#f0f9ff',
-          borderRadius: '5px',
-          fontSize: '14px',
-          color: '#1e40af'
-        }}>
-          <strong>Default Credentials:</strong><br />
-          Email: <code>admin@fpt.edu.vn</code><br />
-          Password: <code>changeme</code>
-        </div>
-      </div>
+          <Form.Item
+            name="password"
+            label="Password"
+            rules={[{ required: true, message: 'Please input your password!' }]}
+          >
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="Enter your password"
+              size="large"
+            />
+          </Form.Item>
+
+          <Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={loading}
+              block
+              size="large"
+            >
+              Login
+            </Button>
+          </Form.Item>
+        </Form>
+
+        <Alert
+          message="Default Credentials"
+          description={
+            <div>
+              <Text strong>Email:</Text> <Text code>admin@fpt.edu.vn</Text><br />
+              <Text strong>Password:</Text> <Text code>changeme</Text>
+            </div>
+          }
+          type="info"
+          showIcon
+          style={{ marginTop: 16 }}
+        />
+      </Card>
     </div>
   );
 }
 
 export default Login;
-
