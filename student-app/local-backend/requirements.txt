@@ -8,3 +8,9 @@ requests
 sqlalchemy
 pydantic-settings
 python-dotenv
+python-multipart
+# File processing (optional - install as needed)
+# Pillow>=10.0.0  # For image processing
+# pytesseract>=0.3.10  # For OCR (requires Tesseract OCR installed)
+# PyPDF2>=3.0.0  # For PDF text extraction
+# python-docx>=1.1.0  # For Word document extraction

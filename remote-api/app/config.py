@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     # CORS CONFIGURATION
     # ============================================
 
-    ALLOWED_ORIGINS: str = "https://app.fpt.edu.vn,https://admin.fpt.edu.vn"
+    ALLOWED_ORIGINS: str = "https://app.fpt.edu.vn,https://admin.fpt.edu.vn,http://localhost:3000,http://localhost:3001,http://localhost:5173"
 
     # ============================================
     # FILE STORAGE (cho installers và packages)

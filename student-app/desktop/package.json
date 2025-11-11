@@ -16,9 +16,15 @@
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
     "antd": "^5.28.0",
+    "buffer": "^6.0.3",
     "dayjs": "^1.11.19",
     "electron-log": "^5.0.1",
-    "electron-updater": "^6.1.7"
+    "electron-updater": "^6.1.7",
+    "process": "^0.11.10",
+    "react-markdown": "^9.1.0",
+    "react-syntax-highlighter": "^15.6.6",
+    "rehype-raw": "^7.0.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",

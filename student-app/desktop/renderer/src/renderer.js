@@ -1,51 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Layout, Input, Button, List, Card, Space, Tag, Badge, Empty, Spin, message, Modal } from 'antd';
-import { SendOutlined, PlusOutlined, DeleteOutlined, MenuFoldOutlined, MenuUnfoldOutlined, RobotOutlined, UserOutlined, LoginOutlined, LogoutOutlined, MessageOutlined } from '@ant-design/icons';
+import { SendOutlined, PlusOutlined, DeleteOutlined, MenuFoldOutlined, MenuUnfoldOutlined, RobotOutlined, UserOutlined, LoginOutlined, LogoutOutlined, MessageOutlined, FileOutlined } from '@ant-design/icons';
 import { UpdateButton, OfflineIndicator } from './components';
 import LoginModal from './components/LoginModal';
 import FeedbackModal from './components/FeedbackModal';
+import LearningPackageUpdateModal from './components/LearningPackageUpdateModal';
+// Temporarily disable MarkdownRenderer due to Electron compatibility issues
+// import MarkdownRenderer from './components/MarkdownRenderer';
+import FileUpload from './components/FileUpload';
 // Import Ant Design CSS - Must be imported before any other styles
 import 'antd/dist/reset.css';
 
 const DEFAULT_BACKEND_URL = 'http://localhost:8000';
-
-// Simple markdown renderer
-const renderMarkdown = (text) => {
-  if (!text) return '';
-
-  let html = text
-    // Code blocks
-    .replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
-      return `<pre class="code-block"><code class="language-${lang || 'text'}">${escapeHtml(code.trim())}</code></pre>`;
-    })
-    // Inline code
-    .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
-    // Bold
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    // Italic
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Headers
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    // Lists
-    .replace(/^\- (.+)$/gm, '<li>$1</li>')
-    .replace(/^(\d+)\. (.+)$/gm, '<li>$2</li>')
-    // Line breaks
-    .replace(/\n/g, '<br>');
-
-  // Wrap list items
-  html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
-
-  return html;
-};
-
-const escapeHtml = (text) => {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-};
 
 const App = () => {
   const [messages, setMessages] = useState([]);
@@ -59,6 +26,9 @@ const App = () => {
   const [user, setUser] = useState(null);
   const [loginModalVisible, setLoginModalVisible] = useState(false);
   const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
+  const [learningPackageModalVisible, setLearningPackageModalVisible] = useState(false);
+  const [learningPackageInfo, setLearningPackageInfo] = useState(null);
+  const [attachedFiles, setAttachedFiles] = useState([]);
   const [userId] = useState(() => {
     // Lấy user_id từ localStorage hoặc tạo mới
     let uid = localStorage.getItem('user_id');
@@ -101,6 +71,25 @@ const App = () => {
       }
     };
     initBackendUrl();
+  }, []);
+
+  // Listen for learning package update events
+  useEffect(() => {
+    if (window.electronAPI?.onLearningPackageUpdate) {
+      const handleLearningPackageUpdate = (data) => {
+        if (data.status === 'available') {
+          setLearningPackageInfo(data);
+          setLearningPackageModalVisible(true);
+        }
+      };
+
+      window.electronAPI.onLearningPackageUpdate(handleLearningPackageUpdate);
+
+      return () => {
+        // Cleanup: remove listener if possible
+        // Note: ipcRenderer.removeListener would need to be called, but we'll keep it simple
+      };
+    }
   }, []);
 
   // Check backend health và load conversation
@@ -354,10 +343,16 @@ const App = () => {
 
     // Kiểm tra loading cho conversation hiện tại
     const isCurrentConversationLoading = loadingConversations.get(currentConvId) || false;
-    if (!input.trim() || isCurrentConversationLoading || backendStatus !== 'online') return;
+
+    // Check if there's input or files to send
+    const hasFiles = attachedFiles.length > 0;
+    if ((!input.trim() && !hasFiles) || isCurrentConversationLoading || backendStatus !== 'online') return;
 
     const userMessage = input.trim();
     setInput('');
+
+    // Clear attached files after sending
+    setAttachedFiles([]);
 
     // Set loading cho conversation hiện tại
     setLoadingConversations(prev => {
@@ -389,14 +384,47 @@ const App = () => {
     }
 
     try {
-      const response = await fetch(`${backendUrl}/api/v1/chat/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      // Prepare FormData if there are files, otherwise use JSON
+      let requestBody;
+      let headers = {};
+
+      // Get files to send
+      const filesToSend = attachedFiles.filter(file => {
+        const fileObj = file.originFileObj || file;
+        return fileObj instanceof File || fileObj instanceof Blob;
+      });
+
+      if (filesToSend.length > 0) {
+        // Use FormData for file uploads
+        const formData = new FormData();
+        formData.append('question', userMessage || '');
+        formData.append('user_id', userId);
+        formData.append('conversation_id', currentConvId || '');
+
+        // Append files
+        filesToSend.forEach((file) => {
+          const fileObj = file.originFileObj || file;
+          if (fileObj instanceof File) {
+            formData.append('files', fileObj);
+          }
+        });
+
+        requestBody = formData;
+        // Don't set Content-Type header, browser will set it with boundary
+      } else {
+        // Use JSON for text-only messages
+        headers['Content-Type'] = 'application/json';
+        requestBody = JSON.stringify({
           question: userMessage,
           user_id: userId,
           conversation_id: currentConvId
-        })
+        });
+      }
+
+      const response = await fetch(`${backendUrl}/api/v1/chat/stream`, {
+        method: 'POST',
+        headers: headers,
+        body: requestBody
       });
 
       if (!response.ok) {
@@ -758,17 +786,66 @@ const App = () => {
                         color: msg.role === 'user' ? '#fff' : '#333'
                       }}
                     >
-                      <Space>
+                      <Space direction="vertical" size="small" style={{ width: '100%' }}>
                         {msg.role === 'user' ? <UserOutlined /> : <RobotOutlined />}
-                        {msg.role === 'assistant' ? (
-                          <div
-                            dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
-                            className="markdown-content"
-                            style={{ color: '#333' }}
-                          />
-                        ) : (
-                          <div style={{ color: '#fff' }}>{msg.content}</div>
+                        {msg.files && msg.files.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                            {msg.files.map((file, fileIdx) => {
+                              const isImage = file.type?.startsWith('image/');
+                              return (
+                                <div
+                                  key={fileIdx}
+                                  style={{
+                                    border: '1px solid rgba(255,255,255,0.3)',
+                                    borderRadius: 8,
+                                    padding: 8,
+                                    background: 'rgba(255,255,255,0.1)',
+                                    maxWidth: isImage ? 200 : 250
+                                  }}
+                                >
+                                  {isImage ? (
+                                    <img
+                                      src={file.url}
+                                      alt={file.name}
+                                      style={{
+                                        width: 180,
+                                        height: 120,
+                                        objectFit: 'cover',
+                                        borderRadius: 4
+                                      }}
+                                    />
+                                  ) : (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <FileOutlined style={{ fontSize: 20, color: '#fff' }} />
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{
+                                          fontSize: 12,
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          whiteSpace: 'nowrap',
+                                          color: '#fff'
+                                        }}>
+                                          {file.name}
+                                        </div>
+                                        <div style={{ fontSize: 10, opacity: 0.8, color: '#fff' }}>
+                                          {file.type || 'File'}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         )}
+                        {/* Temporarily disabled MarkdownRenderer - using plain text */}
+                        <div style={{
+                          color: msg.role === 'user' ? '#fff' : '#333',
+                          whiteSpace: 'pre-wrap',
+                          lineHeight: '1.6'
+                        }}>
+                          {msg.content || ''}
+                        </div>
                       </Space>
                     </Card>
                   </div>
@@ -789,7 +866,12 @@ const App = () => {
 
           {/* Input */}
           <div style={{ padding: '16px 24px', background: '#fff', borderTop: '1px solid #e0e0e0' }}>
-            <Space.Compact style={{ width: '100%' }}>
+            <FileUpload
+              onFilesChange={setAttachedFiles}
+              maxFiles={5}
+              maxSize={10 * 1024 * 1024} // 10MB
+            />
+            <Space.Compact style={{ width: '100%', marginTop: 8 }}>
               <TextArea
                 ref={inputRef}
                 value={input}
@@ -809,7 +891,7 @@ const App = () => {
                 type="primary"
                 icon={<SendOutlined />}
                 loading={isCurrentConversationLoading}
-                disabled={!input.trim() || backendStatus !== 'online'}
+                disabled={(!input.trim() && attachedFiles.length === 0) || backendStatus !== 'online'}
                 onClick={handleSubmit}
                 style={{ height: 'auto' }}
               >
@@ -841,6 +923,17 @@ const App = () => {
         visible={feedbackModalVisible}
         onCancel={() => setFeedbackModalVisible(false)}
         onSuccess={() => setFeedbackModalVisible(false)}
+      />
+
+      {/* Learning Package Update Modal */}
+      <LearningPackageUpdateModal
+        visible={learningPackageModalVisible}
+        onClose={() => {
+          setLearningPackageModalVisible(false);
+          setLearningPackageInfo(null);
+        }}
+        packageInfo={learningPackageInfo}
+        backendUrl={backendUrl}
       />
     </OfflineIndicator>
   );

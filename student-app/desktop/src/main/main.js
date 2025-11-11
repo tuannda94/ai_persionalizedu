@@ -17,39 +17,69 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // sandbox: false allows preload to expose Node.js modules
+      sandbox: false,
+      // Enable DevTools for debugging
+      devTools: true
     },
     icon: path.join(__dirname, '../../resources/icons/icon.png')
   });
 
+  // Open DevTools in development
+  if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+    mainWindow.webContents.openDevTools();
+  }
+
   // Hiển thị cửa sổ khi content đã sẵn sàng
   mainWindow.once('ready-to-show', () => {
+    console.log('✅ Window ready to show');
     mainWindow.show();
   });
 
-  // Start backend trước khi load app
+  // Fallback: Force show window after 3 seconds if ready-to-show didn't fire
+  setTimeout(() => {
+    if (!mainWindow.isVisible()) {
+      console.log('⚠️  Force showing window (ready-to-show timeout)');
+      mainWindow.show();
+    }
+  }, 3000);
+
+  // Log errors from renderer
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('❌ Failed to load:', errorCode, errorDescription, validatedURL);
+    // Show window even if load failed
+    if (!mainWindow.isVisible()) {
+      mainWindow.show();
+    }
+  });
+
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    if (level === 3) { // Error level
+      console.error('Renderer error:', message, 'at', sourceId, ':', line);
+    }
+  });
+
+  // Log when DOM is ready
+  mainWindow.webContents.on('dom-ready', () => {
+    console.log('✅ DOM ready');
+  });
+
+  // Load app immediately, don't wait for backend
+  // Backend will start in background and app will show "offline" until it's ready
+  mainWindow.loadFile(path.join(__dirname, '../../index.html'));
+
+  // Initialize auto-updater
+  initUpdater(mainWindow);
+
+  // Start backend in background (non-blocking)
   startBackend()
     .then(() => {
       console.log('✅ Backend started successfully from Electron');
-
-      // Wait a bit for backend to be fully ready
-      setTimeout(() => {
-        // Load app sau khi backend ready
-        mainWindow.loadFile(path.join(__dirname, '../../index.html'));
-
-        // Initialize auto-updater sau khi window ready
-        initUpdater(mainWindow);
-      }, 2000);
     })
     .catch((error) => {
       console.error('❌ Failed to start backend:', error);
-      console.log('⚠️  Loading app anyway, backend may start later...');
-
-      // Vẫn load app, nhưng sẽ hiển thị error
-      mainWindow.loadFile(path.join(__dirname, '../../index.html'));
-
-      // Initialize auto-updater ngay cả khi backend fail
-      initUpdater(mainWindow);
+      console.log('⚠️  Backend may start later, app will show offline status...');
     });
 }
 

@@ -29,6 +29,13 @@ class AppVersion(Base):
     published_at = Column(DateTime)
     published_by = Column(UUID(as_uuid=True), ForeignKey("users.id"))
 
+    # Learning Package fields (optional - chỉ khi có package mới)
+    learning_package_url = Column(Text)  # URL to learning package zip file
+    learning_package_hash = Column(String(64))  # SHA-256 hash of learning package
+    learning_package_size = Column(BigInteger)  # Size in bytes
+    learning_package_manifest = Column(Text)  # JSON manifest describing package contents
+    has_learning_package = Column(Boolean, default=False)  # Flag to indicate if this version includes a learning package
+
     # Relationships
     publisher = relationship("User", back_populates="published_versions")
 
@@ -47,6 +54,12 @@ class AppVersion(Base):
             "min_version_code": self.min_version_code,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "published_at": self.published_at.isoformat() if self.published_at else None,
+            # Learning package fields
+            "has_learning_package": self.has_learning_package or False,
+            "learning_package_url": self.learning_package_url,
+            "learning_package_hash": self.learning_package_hash,
+            "learning_package_size": self.learning_package_size,
+            "learning_package_manifest": self.learning_package_manifest
         }
 
 

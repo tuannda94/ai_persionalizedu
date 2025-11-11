@@ -102,7 +102,12 @@ function startBackend() {
   return new Promise(async (resolve, reject) => {
     try {
       // First, check if backend is already running and healthy
-      const isHealthy = await checkBackendHealth();
+      // Use a quick check with short timeout
+      const isHealthy = await Promise.race([
+        checkBackendHealth(),
+        new Promise(resolve => setTimeout(() => resolve(false), 1000)) // 1 second max wait
+      ]);
+
       if (isHealthy) {
         console.log('✅ Backend is already running and healthy (from bash script)');
         console.log('   Using existing backend, not starting a new one');
@@ -110,48 +115,53 @@ function startBackend() {
       }
 
       // Backend is not healthy, check if port is in use
-      try {
-        const portCheck = execSync(`lsof -ti :${BACKEND_PORT}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-        if (portCheck && portCheck.trim()) {
-          const pids = portCheck.trim().split('\n').filter(p => p);
-          console.log(`⚠️  Port ${BACKEND_PORT} is in use (PIDs: ${pids.join(', ')}) but not healthy`);
-          console.log(`   Killing existing process(es) and starting new one...`);
+      // Do this asynchronously to not block Electron startup
+      setImmediate(() => {
+        try {
+          const portCheck = execSync(`lsof -ti :${BACKEND_PORT}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+          if (portCheck && portCheck.trim()) {
+            const pids = portCheck.trim().split('\n').filter(p => p);
+            console.log(`⚠️  Port ${BACKEND_PORT} is in use (PIDs: ${pids.join(', ')}) but not healthy`);
+            console.log(`   Killing existing process(es) and starting new one...`);
 
-          // Kill each process
-          for (const pid of pids) {
-            try {
-              execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
-              console.log(`   ✅ Killed PID: ${pid}`);
-            } catch (e) {
-              console.log(`   ⚠️  Could not kill PID ${pid}`);
+            // Try SIGTERM first (graceful shutdown)
+            for (const pid of pids) {
+              try {
+                execSync(`kill -TERM ${pid}`, { stdio: 'ignore' });
+                console.log(`   ✅ Sent SIGTERM to PID: ${pid}`);
+              } catch (e) {
+                // Ignore
+              }
             }
-          }
 
-          // Wait for port to be released
-          const start = Date.now();
-          while (Date.now() - start < 2000) {
-            // Busy wait for 2 seconds
+            // Wait a bit for graceful shutdown (non-blocking)
+            setTimeout(() => {
+              // Check if processes are still running, force kill if needed
+              try {
+                const stillRunning = execSync(`lsof -ti :${BACKEND_PORT}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+                if (stillRunning && stillRunning.trim()) {
+                  const remainingPids = stillRunning.trim().split('\n').filter(p => p);
+                  console.log(`   ⚠️  Some processes still running, force killing...`);
+                  for (const pid of remainingPids) {
+                    try {
+                      execSync(`kill -9 ${pid}`, { stdio: 'ignore' });
+                      console.log(`   ✅ Force killed PID: ${pid}`);
+                    } catch (e) {
+                      console.log(`   ⚠️  Could not kill PID ${pid}`);
+                    }
+                  }
+                }
+              } catch (e) {
+                // Port is free now
+                console.log(`   ✅ Port ${BACKEND_PORT} is now free`);
+              }
+            }, 1000);
           }
-
-          // Verify port is free
-          try {
-            const stillInUse = execSync(`lsof -ti :${BACKEND_PORT}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-            if (stillInUse && stillInUse.trim()) {
-              console.log(`   ⚠️  Port still in use, trying force kill...`);
-              execSync(`lsof -ti :${BACKEND_PORT} | xargs kill -9`, { stdio: 'ignore' });
-              // Wait again
-              const start2 = Date.now();
-              while (Date.now() - start2 < 1000) {}
-            }
-          } catch (e) {
-            // Port is free now
-            console.log(`   ✅ Port ${BACKEND_PORT} is now free`);
-          }
+        } catch (e) {
+          // Port is free, continue
+          console.log(`   ✅ Port ${BACKEND_PORT} is free, starting new backend...`);
         }
-      } catch (e) {
-        // Port is free, continue
-        console.log(`   ✅ Port ${BACKEND_PORT} is free, starting new backend...`);
-      }
+      });
 
       const config = getBackendConfig();
 
@@ -268,24 +278,38 @@ function stopBackend() {
  */
 async function checkBackendHealth() {
   try {
-    const response = await fetch(`${BACKEND_URL}/health`, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-      // 5 second timeout
-      signal: AbortSignal.timeout(5000)
-    });
+    // Use AbortController for better timeout control
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
 
-    if (!response.ok) {
+    try {
+      const response = await fetch(`${BACKEND_URL}/health`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+        },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const data = await response.json();
+      // Check both 'ok' and 'status' fields
+      return data.ok === true || data.status === 'ok';
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      // Don't log timeout errors as they're expected when backend is not running
+      if (fetchError.name !== 'AbortError' && !fetchError.message.includes('timeout')) {
+        console.error('Backend health check failed:', fetchError.message);
+      }
       return false;
     }
-
-    const data = await response.json();
-    // Check both 'ok' and 'status' fields
-    return data.ok === true || data.status === 'ok';
   } catch (error) {
-    console.error('Backend health check failed:', error);
+    // Ignore errors silently - backend might not be running
     return false;
   }
 }

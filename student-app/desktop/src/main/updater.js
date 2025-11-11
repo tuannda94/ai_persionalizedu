@@ -225,7 +225,12 @@ async function checkForUpdates() {
           releaseNotes: data.release_notes,
           downloadUrl: data.download_url,
           isMandatory: data.is_mandatory,
-          fileSize: data.file_size
+          fileSize: data.file_size,
+          hasLearningPackage: data.has_learning_package || false,
+          learningPackageUrl: data.learning_package_url,
+          learningPackageHash: data.learning_package_hash,
+          learningPackageSize: data.learning_package_size,
+          learningPackageManifest: data.learning_package_manifest
         });
 
         // If mandatory, force update
@@ -237,10 +242,57 @@ async function checkForUpdates() {
             downloadUrl: data.download_url
           });
         }
+
+        // Check for learning package update separately
+        if (data.has_learning_package && data.learning_package_url) {
+          checkLearningPackageUpdate(data);
+        }
       }
     }
   } catch (error) {
     log.error('Error checking for updates:', error);
+  }
+}
+
+/**
+ * Check for learning package update
+ */
+async function checkLearningPackageUpdate(appUpdateData) {
+  try {
+    // Get local backend URL (default: http://localhost:8000)
+    const localBackendUrl = process.env.LOCAL_BACKEND_URL || 'http://localhost:8000';
+
+    // Check current learning package version
+    const currentResponse = await makeRequest(`${localBackendUrl}/api/v1/learning-package/current`, {
+      method: 'GET'
+    });
+
+    let currentVersionCode = 0;
+    if (currentResponse.ok) {
+      const currentData = await currentResponse.json();
+      if (currentData.installed) {
+        currentVersionCode = currentData.version_code || 0;
+      }
+    }
+
+    // Check if learning package needs update
+    const latestVersionCode = appUpdateData.latest_version_code || 0;
+
+    if (latestVersionCode > currentVersionCode) {
+      log.info(`Learning package update available: ${appUpdateData.latest_version}`);
+
+      mainWindow?.webContents.send('learning-package-update', {
+        status: 'available',
+        version: appUpdateData.latest_version,
+        versionCode: latestVersionCode,
+        downloadUrl: appUpdateData.learning_package_url,
+        packageHash: appUpdateData.learning_package_hash,
+        packageSize: appUpdateData.learning_package_size,
+        manifest: appUpdateData.learning_package_manifest
+      });
+    }
+  } catch (error) {
+    log.error('Error checking for learning package update:', error);
   }
 }
 
@@ -306,6 +358,36 @@ ipcMain.handle('download-update', async () => {
 
 ipcMain.handle('install-update', () => {
   autoUpdater.quitAndInstall();
+});
+
+ipcMain.handle('install-learning-package', async (event, packageData) => {
+  try {
+    const localBackendUrl = process.env.LOCAL_BACKEND_URL || 'http://localhost:8000';
+
+    const response = await makeRequest(`${localBackendUrl}/api/v1/learning-package/install`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        download_url: packageData.downloadUrl,
+        version: packageData.version,
+        version_code: packageData.versionCode,
+        package_hash: packageData.packageHash,
+        manifest: packageData.manifest
+      })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return { ok: true, message: data.message };
+    } else {
+      return { ok: false, error: 'Failed to start learning package install' };
+    }
+  } catch (error) {
+    log.error('Error installing learning package:', error);
+    return { ok: false, error: error.message };
+  }
 });
 
 module.exports = {

@@ -33,9 +33,27 @@ cleanup() {
         kill $ADMIN_DASHBOARD_PID 2>/dev/null || true
     fi
 
+    if [ ! -z "$BACKEND_PID" ]; then
+        echo "   Stopping Local Backend (PID: $BACKEND_PID)..."
+        kill $BACKEND_PID 2>/dev/null || true
+    fi
+
+    if [ ! -z "$STUDENT_APP_PID" ]; then
+        echo "   Stopping Electron (PID: $STUDENT_APP_PID)..."
+        kill $STUDENT_APP_PID 2>/dev/null || true
+    fi
+
     # Kill by port
     lsof -ti :8001 | xargs kill -9 2>/dev/null || true
+    lsof -ti :8000 | xargs kill -9 2>/dev/null || true
     lsof -ti :3000 | xargs kill -9 2>/dev/null || true
+    lsof -ti :3001 | xargs kill -9 2>/dev/null || true
+
+    # Kill Electron processes (more aggressive)
+    pkill -9 -f "electron" 2>/dev/null || true
+    pkill -9 -f "Electron" 2>/dev/null || true
+    # Kill any Electron processes from our app specifically
+    pkill -9 -f "poly-ai-demo" 2>/dev/null || true
 
     echo "   ✅ All services stopped"
     exit 0
@@ -122,11 +140,109 @@ if [ -d "$PROJECT_ROOT/student-app" ]; then
     cd "$PROJECT_ROOT"
 
     # Start Student App (this will start backend + Electron)
+    # Note: Electron needs GUI access, so we'll start it in a way that allows window display
     echo "   🚀 Starting Student App..."
-    bash "$SCRIPT_DIR/start_student_app.sh" &
-    STUDENT_APP_PID=$!
-    echo "   ✅ Student App started (PID: $STUDENT_APP_PID)"
-    echo "   📱 Electron app will open automatically"
+    echo "   📱 Electron app window will open automatically"
+
+    # Start backend first (in background)
+    echo "   📡 Starting local backend..."
+    cd "$PROJECT_ROOT/student-app/local-backend"
+
+    # Create virtual environment if not exists
+    if [ ! -d ".venv" ]; then
+        python3 -m venv .venv
+    fi
+
+    # Activate and start backend
+    source .venv/bin/activate
+    pip install -q --upgrade pip
+    pip install -q -r requirements.txt 2>/dev/null || true
+
+    # Kill existing backend on port 8000
+    lsof -ti :8000 | xargs kill -9 2>/dev/null || true
+
+    # Start backend in background
+    nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/local-backend.log 2>&1 &
+    BACKEND_PID=$!
+    echo "   ✅ Backend started (PID: $BACKEND_PID)"
+
+    # Wait for backend to be ready
+    echo "   ⏳ Waiting for backend to be ready..."
+    for i in $(seq 1 30); do
+        if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+            echo "   ✅ Backend is ready!"
+            break
+        fi
+        sleep 1
+    done
+
+    # Now start Electron (in a way that allows GUI)
+    cd "$PROJECT_ROOT/student-app/desktop"
+
+    # Check if node_modules exists
+    if [ ! -d "node_modules" ]; then
+        echo "   📦 Installing npm dependencies..."
+        npm install
+    fi
+
+    # Build renderer if needed
+    if [ ! -f "renderer/dist/renderer.bundle.js" ]; then
+        echo "   🔨 Building renderer..."
+        npm run build:dev 2>/dev/null || npm run build:renderer 2>/dev/null || true
+    fi
+
+    # Start Electron - needs GUI access
+    echo "   🚀 Starting Electron..."
+    cd "$PROJECT_ROOT/student-app/desktop"
+
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS: Electron needs GUI access
+        # The best way is to run it in a new Terminal window or use osascript
+        echo "   📱 Launching Electron app in new Terminal window..."
+
+        # Create a launch script
+        LAUNCH_SCRIPT="/tmp/launch_electron_$$.sh"
+        cat > "$LAUNCH_SCRIPT" << EOF
+#!/bin/bash
+cd "$PROJECT_ROOT/student-app/desktop"
+echo "🚀 Starting Electron..."
+npm start
+EOF
+        chmod +x "$LAUNCH_SCRIPT"
+
+        # Use osascript to open in a new Terminal window
+        # This ensures Electron has GUI access
+        osascript << APPLESCRIPT
+tell application "Terminal"
+    activate
+    do script "bash '$LAUNCH_SCRIPT'"
+end tell
+APPLESCRIPT
+
+        echo "   ✅ Electron launching in new Terminal window"
+        echo "   📱 Electron window will open automatically"
+        echo "   💡 You can close the Terminal window after Electron starts"
+
+        # Give it a moment
+        sleep 3
+
+        # Try to find the Electron process
+        STUDENT_APP_PID=$(pgrep -f "electron.*main.js" | head -1)
+        if [ -n "$STUDENT_APP_PID" ]; then
+            echo "   ✅ Electron process found (PID: $STUDENT_APP_PID)"
+        else
+            echo "   ⚠️  Electron process not found yet, it may still be starting..."
+        fi
+    else
+        # Linux: Use DISPLAY variable and run in background
+        export DISPLAY=${DISPLAY:-:0}
+        npm start > /tmp/electron.log 2>&1 &
+        STUDENT_APP_PID=$!
+        echo "   ✅ Electron started (PID: $STUDENT_APP_PID)"
+    fi
+
+    echo "   📄 Logs: /tmp/electron.log (if available)"
+    echo "   📄 Backend logs: /tmp/local-backend.log"
 else
     echo "   ⚠️  Student App not found, skipping..."
 fi
@@ -146,7 +262,8 @@ echo ""
 echo "📄 Logs:"
 echo "   Remote API:      /tmp/remote-api.log"
 echo "   Admin Dashboard: /tmp/admin-dashboard.log"
-echo "   Student App:     /tmp/local-backend.log"
+echo "   Local Backend:   /tmp/local-backend.log"
+echo "   Electron:        /tmp/electron.log"
 echo ""
 echo "🛑 Press Ctrl+C to stop all services"
 echo ""

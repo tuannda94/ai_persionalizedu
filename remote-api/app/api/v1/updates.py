@@ -20,6 +20,9 @@ from app.schemas.version import (
     UpdateLogResponse
 )
 from app.core.security import get_current_user, get_current_admin_user
+from app.services.file_service import save_uploaded_file, get_download_url
+from app.config import settings
+from datetime import datetime
 
 router = APIRouter(prefix="/updates", tags=["updates"])
 
@@ -65,7 +68,12 @@ async def check_for_updates(
         is_mandatory=is_mandatory,
         release_notes=latest_version.release_notes,
         file_size=latest_version.file_size,
-        file_hash=latest_version.file_hash
+        file_hash=latest_version.file_hash,
+        has_learning_package=latest_version.has_learning_package or False,
+        learning_package_url=latest_version.learning_package_url,
+        learning_package_hash=latest_version.learning_package_hash,
+        learning_package_size=latest_version.learning_package_size,
+        learning_package_manifest=latest_version.learning_package_manifest
     )
 
 
@@ -167,6 +175,9 @@ async def upload_version(
     release_notes: Optional[str] = Form(None),
     is_mandatory: bool = Form(False),
     min_version_code: Optional[int] = Form(None),
+    # Learning package (optional)
+    learning_package: Optional[UploadFile] = File(None),
+    learning_package_manifest: Optional[str] = Form(None),  # JSON string describing package contents
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
@@ -220,6 +231,39 @@ async def upload_version(
             file_path = Path(file_path_or_object)
             download_url = get_download_url(file_path.name, "installers")
 
+        # Handle learning package upload (optional)
+        learning_package_url = None
+        learning_package_hash = None
+        learning_package_size = None
+        learning_package_manifest_json = None
+        has_learning_package = False
+
+        if learning_package:
+            try:
+                # Save learning package
+                package_path_or_object, package_hash, package_size = await save_uploaded_file(
+                    learning_package,
+                    subdirectory="learning-packages",
+                    filename=f"{platform}-{version}-learning-package.zip"
+                )
+
+                # Generate download URL for learning package
+                if settings.STORAGE_TYPE == "minio":
+                    learning_package_url = get_download_url(package_path_or_object, "learning-packages", use_presigned=True)
+                else:
+                    from pathlib import Path
+                    package_path = Path(package_path_or_object)
+                    learning_package_url = get_download_url(package_path.name, "learning-packages")
+
+                learning_package_hash = package_hash
+                learning_package_size = package_size
+                learning_package_manifest_json = learning_package_manifest
+                has_learning_package = True
+            except Exception as e:
+                # Log error but don't fail version creation if learning package fails
+                print(f"⚠️  Failed to upload learning package: {e}")
+                # Continue without learning package
+
         # Create version record
         version_obj = AppVersion(
             version=version,
@@ -233,7 +277,13 @@ async def upload_version(
             is_mandatory=is_mandatory,
             min_version_code=min_version_code,
             published_by=current_user.id,
-            published_at=datetime.utcnow()  # Auto-publish on upload
+            published_at=datetime.utcnow(),  # Auto-publish on upload
+            # Learning package fields
+            has_learning_package=has_learning_package,
+            learning_package_url=learning_package_url,
+            learning_package_hash=learning_package_hash,
+            learning_package_size=learning_package_size,
+            learning_package_manifest=learning_package_manifest_json
         )
 
         db.add(version_obj)

@@ -20,6 +20,7 @@ from app.schemas.package import (
 )
 from app.core.security import get_current_user, get_current_admin_user
 from app.services.file_service import save_uploaded_file, get_download_url, delete_file
+from app.config import settings
 
 router = APIRouter(prefix="/packages", tags=["packages"])
 

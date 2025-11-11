@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Statistic, Row, Col, Select, Spin, List, Tag } from 'antd';
+import { Card, Statistic, Row, Col, Select, Spin, List, Tag, Space } from 'antd';
 import { BarChartOutlined, MessageOutlined, ClockCircleOutlined, TrophyOutlined } from '@ant-design/icons';
 import { telemetryAPI, feedbackAPI } from '../services/api';
 import { handleApiError, shouldShowError } from '../utils/errorHandler';

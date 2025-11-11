@@ -16,8 +16,24 @@ class PackageResponse(BaseModel):
     download_url: str
     description: Optional[str] = None
     is_active: bool
-    created_at: Optional[datetime] = None
-    published_at: Optional[datetime] = None
+    created_at: Optional[str] = None
+    published_at: Optional[str] = None
+
+    @classmethod
+    def from_orm(cls, obj):
+        """Convert ORM object to response, handling UUID and datetime conversion"""
+        return cls(
+            id=str(obj.id),
+            subject=obj.subject,
+            version=obj.version,
+            file_size=obj.file_size,
+            file_hash=obj.file_hash,
+            download_url=obj.download_url,
+            description=obj.description,
+            is_active=obj.is_active or False,
+            created_at=obj.created_at.isoformat() if obj.created_at else None,
+            published_at=obj.published_at.isoformat() if obj.published_at else None
+        )
 
     class Config:
         from_attributes = True

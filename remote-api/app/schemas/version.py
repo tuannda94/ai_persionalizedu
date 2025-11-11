@@ -21,6 +21,12 @@ class VersionCheckResponse(BaseModel):
     release_notes: Optional[str] = None
     file_size: Optional[int] = None
     file_hash: Optional[str] = None
+    # Learning package info (if available)
+    has_learning_package: Optional[bool] = False
+    learning_package_url: Optional[str] = None
+    learning_package_hash: Optional[str] = None
+    learning_package_size: Optional[int] = None
+    learning_package_manifest: Optional[str] = None
 
 
 class VersionCreate(BaseModel):
@@ -56,6 +62,36 @@ class VersionResponse(BaseModel):
     min_version_code: Optional[int]
     created_at: Optional[str]
     published_at: Optional[str]
+    # Learning package fields
+    has_learning_package: Optional[bool] = False
+    learning_package_url: Optional[str] = None
+    learning_package_hash: Optional[str] = None
+    learning_package_size: Optional[int] = None
+    learning_package_manifest: Optional[str] = None
+
+    @classmethod
+    def from_orm(cls, obj):
+        """Convert ORM object to response, handling UUID and datetime conversion"""
+        return cls(
+            id=str(obj.id),
+            version=obj.version,
+            version_code=obj.version_code,
+            platform=obj.platform,
+            release_type=obj.release_type,
+            download_url=obj.download_url,
+            release_notes=obj.release_notes,
+            file_size=obj.file_size,
+            file_hash=obj.file_hash,
+            is_mandatory=obj.is_mandatory or False,
+            min_version_code=obj.min_version_code,
+            created_at=obj.created_at.isoformat() if obj.created_at else None,
+            published_at=obj.published_at.isoformat() if obj.published_at else None,
+            has_learning_package=obj.has_learning_package or False,
+            learning_package_url=obj.learning_package_url,
+            learning_package_hash=obj.learning_package_hash,
+            learning_package_size=obj.learning_package_size,
+            learning_package_manifest=obj.learning_package_manifest
+        )
 
     class Config:
         from_attributes = True

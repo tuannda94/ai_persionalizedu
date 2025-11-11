@@ -3,6 +3,72 @@
  * Bridge giữa renderer và main process
  */
 const { contextBridge, ipcRenderer } = require('electron');
+const path = require('path');
+const url = require('url');
+const process = require('process');
+const fs = require('fs');
+const util = require('util');
+const stream = require('stream');
+const buffer = require('buffer');
+const crypto = require('crypto');
+const os = require('os');
+const assert = require('assert');
+const constants = require('constants');
+const events = require('events');
+const http = require('http');
+const https = require('https');
+const net = require('net');
+const tls = require('tls');
+const zlib = require('zlib');
+
+// Create a require polyfill for node: modules
+// This is needed because webpack externalizes node: modules
+// and they need to be available at runtime
+const nodeModulesMap = {
+  'node:path': path,
+  'node:url': url,
+  'node:process': process,
+  'node:fs': fs,
+  'node:util': util,
+  'node:stream': stream,
+  'node:buffer': buffer,
+  'node:crypto': crypto,
+  'node:os': os,
+  'node:assert': assert,
+  'node:constants': constants,
+  'node:events': events,
+  'node:http': http,
+  'node:https': https,
+  'node:net': net,
+  'node:tls': tls,
+  'node:zlib': zlib
+};
+
+// Expose require polyfill for node: modules
+// This will be used by webpack externalized modules
+contextBridge.exposeInMainWorld('__node_require__', function(moduleName) {
+  if (nodeModulesMap[moduleName]) {
+    return nodeModulesMap[moduleName];
+  }
+  // Fallback: try to require without node: prefix
+  const withoutPrefix = moduleName.replace(/^node:/, '');
+  if (nodeModulesMap[`node:${withoutPrefix}`]) {
+    return nodeModulesMap[`node:${withoutPrefix}`];
+  }
+  throw new Error(`Module ${moduleName} not available`);
+});
+
+// Also expose as require for compatibility
+// Note: This is safe because we only expose specific modules
+if (typeof window !== 'undefined') {
+  // This will be available in the renderer context
+  window.__electron_require__ = function(moduleName) {
+    if (moduleName.startsWith('node:')) {
+      return window.__node_require__(moduleName);
+    }
+    throw new Error(`Cannot require ${moduleName} in renderer`);
+  };
+}
 
 // Expose API to renderer
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -43,5 +109,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateProgress: (callback) => {
     ipcRenderer.on('update-progress', (event, data) => callback(data));
   },
-});
 
+  // Learning Package handlers
+  installLearningPackage: (packageData) => ipcRenderer.invoke('install-learning-package', packageData),
+  onLearningPackageUpdate: (callback) => {
+    ipcRenderer.on('learning-package-update', (event, data) => callback(data));
+  },
+});

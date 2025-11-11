@@ -1,6 +1,6 @@
 """
 RAG Service - Local Backend
-Xử lý RAG queries từ model packages local
+Xử lý RAG queries từ model packages local hoặc learning packages
 """
 import chromadb
 import json
@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional, List, Tuple
 
 from app.config import settings
+from app.services.learning_package_service import get_learning_package_paths, get_current_learning_package_version
 
 # Model packages directory từ config
 MODEL_PACKAGES = Path(settings.MODEL_PACKAGES_DIR)
@@ -48,15 +49,53 @@ def load_subject_collection(subject_code: str) -> Tuple[chromadb.Collection, int
 
 
 def init_rag_engine():
-    """Khởi tạo RAG engine - load tất cả subjects"""
+    """Khởi tạo RAG engine - load từ learning package hoặc model packages"""
     global collections
 
     print("=== Loading RAG Engine ===")
+
+    # Clear existing collections
+    collections = {}
+
+    # Priority 1: Try to load from learning package
+    current_package = get_current_learning_package_version()
+    if current_package:
+        package_paths = get_learning_package_paths(current_package.get("version"))
+        rag_index_path = package_paths.get("rag_index")
+
+        if rag_index_path and rag_index_path.exists():
+            print(f"📦 Loading from learning package: {current_package.get('version')}")
+            print(f"   RAG index path: {rag_index_path}")
+
+            try:
+                # Try to load ChromaDB from learning package
+                # ChromaDB can load from a persistent directory
+                import chromadb
+                persistent_client = chromadb.PersistentClient(path=str(rag_index_path))
+
+                # List all collections in the persistent client
+                all_collections = persistent_client.list_collections()
+
+                for coll_info in all_collections:
+                    collection = persistent_client.get_collection(coll_info.name)
+                    # Get count
+                    count = collection.count()
+                    collections[coll_info.name] = collection
+                    print(f"✅ Loaded {coll_info.name}: {count} segments from learning package")
+
+                if len(collections) > 0:
+                    print(f"✅ RAG Engine ready with {len(collections)} subjects from learning package: {list(collections.keys())}")
+                    return
+            except Exception as e:
+                print(f"⚠️  Failed to load from learning package: {e}")
+                print("   Falling back to model packages...")
+
+    # Priority 2: Load from model packages (legacy)
     print(f"Looking for model packages in: {MODEL_PACKAGES}")
 
     if not MODEL_PACKAGES.exists():
         print(f"⚠️  WARNING: Model packages directory not found: {MODEL_PACKAGES}")
-        print("   Please run: cd data-pipeline && python embed_and_build_package.py")
+        print("   Please install a learning package or run: cd data-pipeline && python embed_and_build_package.py")
         return
 
     SUBJECTS = [p.name.replace('_v1', '') for p in (MODEL_PACKAGES.glob('*_v1')) if p.is_dir()]
