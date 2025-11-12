@@ -11,6 +11,7 @@ build/
 venv/
 ENV/
 env/
+*.egg
 
 # Node
 node_modules/
@@ -18,6 +19,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 package-lock.json
+.pnpm-debug.log*
 
 # IDEs
 .vscode/
@@ -25,53 +27,235 @@ package-lock.json
 *.swp
 *.swo
 *~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
 
 # Databases
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
+*.sqlite-journal
 
 # Logs
 *.log
 logs/
 telemetry.log
 query.log
+*.log.*
 
 # Environment
 .env
 .env.local
 .env.*.local
+.env.development
+.env.production
+.env.test
 
 # Build outputs
 dist/
 build/
 *.spec.bak
+*.pyc
+*.pyo
 
-# Storage (local)
+# Storage (local - should not be committed)
 student-app/local-backend/storage/
 remote-api/storage/
+storage/databases/
+storage/logs/
 
-# Model packages (large files)
+# Model packages (large files - only ignore large binary files)
 storage/model-packages/**/*.jsonl
+storage/model-packages/**/*.bin
+storage/model-packages/**/*.chroma
+storage/model-packages/**/chroma_db/
+
+# Learning packages (large files)
+student-app/local-backend/storage/learning-packages/
+remote-api/storage/learning-packages/
+remote-api/storage/installers/
+remote-api/storage/packages/
+remote-api/storage/documents/
 
 # Temporary files
 *.tmp
 *.bak
 *.old
+*.swp
+*.swo
+*~
 
 # Electron
 desktop/dist/
 student-app/desktop/dist/
+student-app/desktop/renderer/dist/
+*.app
+*.dmg
+*.exe
+*.AppImage
+*.deb
+*.rpm
 
 # Coverage
 .coverage
 htmlcov/
-
-# Misc
+.coverage.*
 .pytest_cache/
 .mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Testing
+.tox/
+.hypothesis/
+.pytest_cache/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath
+*.sage.py
+
+# Spyder
+.spyderproject
+.spyproject
+
+# Rope
+.ropeproject
+
+# mkdocs
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# pytype
+.pytype/
+
+# Cython
+cython_debug/
+
+# IDEs - JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# IDEs - VSCode
+.vscode/
+*.code-workspace
+
+# IDEs - Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# IDEs - Vim
+*.swp
+*.swo
+*~
+
+# IDEs - Emacs
+*~
+\#*\#
+.\#*
+
+# macOS
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Archives (large files)
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+*.gz
+
+# But keep small archives in specific locations
+!data-pipeline/sample_texts/**/*.zip
+!docs/**/*.zip
+
+# MinIO
+.minio/
+
+# Backup files
+*.backup
+*.orig
+
+# Lock files (keep package-lock.json for npm, but ignore others)
+yarn.lock
+pnpm-lock.yaml
+
+# Local configuration overrides
+config.local.*
+settings.local.*
